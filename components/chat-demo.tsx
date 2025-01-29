@@ -1,27 +1,36 @@
 "use client";
 
-import { useChat } from "ai/react";
+import { useState } from "react";
 import Chat from "@/components/ui/chat";
 import { cn } from "@/lib/utils";
+import type { Message } from "@/components/ui/chat-message";
 
 const API_KEY = "AIzaSyCC6XshnCnVn8PqGaveDZ1Ba8csAt7UvPY";
 const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
 
 export function ChatDemo() {
-    const {
-        messages,
-        input,
-        setInput,
-        append,
-        isLoading,
-        error,
-    } = useChat();
+    const [messages, setMessages] = useState<Message[]>([]);
+    const [input, setInput] = useState("");
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<Error | null>(null);
+
+    const append = (message: Message) => {
+        setMessages(current => [...current, message]);
+    };
 
     const handleChatSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
-        if (!input.trim()) return; // Prevent empty messages
+        if (!input.trim()) return;
 
-        append({ role: "user", content: input });
+        setIsLoading(true);
+        setError(null);
+
+        const userMessage = {
+            id: Date.now().toString(),
+            role: "user",
+            content: input
+        };
+        append(userMessage);
 
         try {
             const response = await fetch(API_URL, {
@@ -36,12 +45,22 @@ export function ChatDemo() {
             if (!response.ok) throw new Error(data.error.message);
 
             const responseText = data.candidates[0].content.parts[0].text;
-            append({ role: "assistant", content: responseText });
+            append({
+                id: (Date.now() + 1).toString(),
+                role: "assistant",
+                content: responseText
+            });
 
-            // Clear input after successful response
             setInput("");
-        } catch (error: any) {
-            append({ role: "assistant", content: error.message || "An error occurred" });
+        } catch (err: any) {
+            setError(err);
+            append({
+                id: (Date.now() + 1).toString(),
+                role: "assistant",
+                content: err.message || "An error occurred"
+            });
+        } finally {
+            setIsLoading(false);
         }
     };
 
