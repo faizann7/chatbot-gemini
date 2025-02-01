@@ -9,12 +9,12 @@ import { FilePreview } from "@/components/ui/file-preview"
 import { MarkdownRenderer } from "@/components/ui/markdown-renderer"
 
 const chatBubbleVariants = cva(
-  "group/message relative break-words rounded-lg p-3 text-sm",
+  "group/message relative break-words p-3 text-sm",
   {
     variants: {
       isUser: {
-        true: "bg-primary text-primary-foreground",
-        false: "bg-gray-50 dark:bg-gray-800 text-foreground",
+        true: "bg-neutral-800 text-white rounded-2xl rounded-br-none self-end max-w-[85%]",
+        false: "text-foreground flex items-start gap-3",
       },
       animation: {
         none: "",
@@ -121,32 +121,35 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   })
 
   return (
-    <div className={cn("flex flex-col", isUser ? "items-end" : "items-start")}>
-      {files ? (
-        <div className="mb-1 flex flex-wrap gap-2">
-          {files.map((file, index) => {
-            return <FilePreview file={file} key={index} />
-          })}
-        </div>
-      ) : null}
-
-      <div className={cn(chatBubbleVariants({ isUser, animation }), className)}>
-        <div>
-          <MarkdownRenderer>{content}</MarkdownRenderer>
-        </div>
-
-        {role === "assistant" && actions ? (
-          <div className="absolute -bottom-4 right-2 flex space-x-1 rounded-lg border bg-background p-1 text-foreground opacity-0 transition-opacity group-hover/message:opacity-100">
-            {actions}
+    <div className={cn("group relative flex flex-col", className)}>
+      <div
+        className={cn(
+          chatBubbleVariants({ isUser: role === "user", animation })
+        )}
+      >
+        {role === "assistant" && (
+          <div className="w-8 h-8 rounded-full bg-[#292929] flex items-center justify-center text-white">
+            AI
           </div>
-        ) : null}
+        )}
+        <div className="flex-1">
+          <div>
+            <MarkdownRenderer>{content}</MarkdownRenderer>
+          </div>
+
+          {role === "assistant" && actions ? (
+            <div className="absolute right-4 top-3 flex items-center gap-1 opacity-0 group-hover/message:opacity-100 transition-opacity">
+              {actions}
+            </div>
+          ) : null}
+        </div>
       </div>
 
       {showTimeStamp && createdAt ? (
         <time
           dateTime={createdAt.toISOString()}
           className={cn(
-            "mt-1 block px-1 text-xs opacity-50",
+            "mt-1 text-xs text-muted-foreground",
             animation !== "none" && "duration-500 animate-in fade-in-0"
           )}
         >

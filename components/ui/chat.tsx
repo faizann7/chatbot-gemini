@@ -116,7 +116,7 @@ const Chat = ({
       ) : null}
 
       <ChatForm
-        className="mt-auto p-4"
+        className="mt-auto p-4 border-t border-border/50"
         isPending={isGenerating || isTyping}
         handleSubmit={handleSubmit}
       >
@@ -129,9 +129,8 @@ const Chat = ({
             setFiles={setFiles}
             stop={stop}
             isGenerating={isGenerating}
-            className="h-auto overflow-hidden resize-none bg-gray-50"
+            className="h-auto overflow-hidden resize-none bg-[#292929] border-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-xl"
           />
-
         )}
       </ChatForm>
     </ChatContainer>

@@ -23,8 +23,11 @@ import {
     Pencil,
     Check,
     X,
+    ListCollapse,
+    PanelRight,
 } from "lucide-react";
 import { toast } from "sonner";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 interface ChatHistory {
     id: string;
@@ -161,6 +164,7 @@ const ChatTitle = ({
 };
 
 export function ChatDemo() {
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
     const [chatHistory, setChatHistory] = useState<ChatHistory[]>([]);
     const [currentChatId, setCurrentChatId] = useState<string>("");
     const [messages, setMessages] = useState<Message[]>([]);
@@ -337,77 +341,107 @@ export function ChatDemo() {
         }
     };
 
+    const toggleSidebar = () => {
+        setIsSidebarCollapsed(!isSidebarCollapsed);
+    };
+
     return (
-        <div className="flex h-screen overflow-hidden bg-white dark:bg-gray-900">
+        <div className="flex h-screen overflow-hidden bg-neutral-900">
             {/* Sidebar - Fixed */}
-            <div className="flex h-full w-[260px] flex-col bg-[#fafafa] border-r border-gray-200 dark:bg-gray-900 dark:border-gray-800">
-                {/* New Chat Button - Fixed */}
-                <div className="flex-none p-3">
+            <div
+                className={cn(
+                    "flex h-full flex-col bg-secondary border-r border-border transition-all duration-200",
+                    isSidebarCollapsed ? "w-[72px]" : "w-[260px]"
+                )}
+            >
+                {/* Top Bar with Collapse Button, New Chat, and Theme Toggle */}
+                <div className="flex-none py-4 px-2 flex items-center gap-2 justify-between">
                     <Button
-                        className="w-full justify-start gap-2 bg-gray-900 hover:bg-gray-800 text-white dark:bg-gray-700 dark:hover:bg-gray-600"
-                        onClick={handleNewChat}
+                        variant="ghost"
+                        size="icon"
+                        className="h-9 w-9 rounded-lg hover:bg-accent"
+                        onClick={toggleSidebar}
                     >
-                        <Plus className="h-4 w-4" />
-                        New chat
+                        <PanelRight className="h-5 w-5" />
                     </Button>
+
+                    <div className="flex items-center gap-2">
+                        {!isSidebarCollapsed && (
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-9 w-9 rounded-lg hover:bg-accent"
+                                onClick={handleNewChat}
+                            >
+                                <Plus className="h-5 w-5" />
+                            </Button>
+                        )}
+                        <ThemeToggle />
+                    </div>
                 </div>
 
                 {/* Chat List - Scrollable */}
                 <ScrollArea className="flex-1">
-                    <div className="px-3 py-2 space-y-1">
+                    <div className="px-2 py-2 space-y-1">
                         {chatHistory.map((chat) => (
                             <div
                                 key={chat.id}
                                 className={cn(
-                                    "group flex items-center justify-between rounded-lg px-3 py-2 cursor-pointer transition-colors duration-200",
+                                    "group flex items-center justify-between rounded-xl px-3 py-2 cursor-pointer transition-colors duration-200",
                                     chat.id === currentChatId
-                                        ? "bg-gray-200 text-gray-900 dark:bg-gray-800 dark:text-white"
-                                        : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                                        ? "bg-accent text-accent-foreground"
+                                        : "text-muted-foreground hover:bg-accent/50"
                                 )}
                                 onClick={() => handleChatSelect(chat.id)}
                             >
-                                <div className="flex items-center gap-2 truncate pr-8">
-                                    <span className="truncate text-sm">{chat.title}</span>
+                                <div className="flex items-center gap-2 truncate">
+                                    {isSidebarCollapsed ? (
+                                        <MessageSquare className="h-4 w-4" />
+                                    ) : (
+                                        <span className="truncate text-sm">{chat.title}</span>
+                                    )}
                                 </div>
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-8 w-8 opacity-0 group-hover:opacity-100 absolute right-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-white"
-                                            onClick={(e) => e.stopPropagation()}
-                                        >
-                                            <MoreVertical className="h-4 w-4" />
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-48">
-                                        <DropdownMenuItem
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                // You can replace this with a modal if desired
-                                                const newTitle = prompt("Enter new name for chat:", chat.title);
-                                                if (newTitle && newTitle.trim() !== "") {
-                                                    handleRenameChat(chat.id, newTitle.trim());
-                                                }
-                                            }}
-                                            className="gap-2"
-                                        >
-                                            <Pencil className="h-4 w-4" />
-                                            Rename chat
-                                        </DropdownMenuItem>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleDeleteChat(chat.id);
-                                            }}
-                                            className="text-red-600 dark:text-red-400 gap-2"
-                                        >
-                                            <Trash className="h-4 w-4" />
-                                            Delete chat
-                                        </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
+                                {!isSidebarCollapsed && (
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8 opacity-0 group-hover:opacity-100 absolute right-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-white"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <MoreVertical className="h-4 w-4" />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" className="w-48">
+                                            <DropdownMenuItem
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    // You can replace this with a modal if desired
+                                                    const newTitle = prompt("Enter new name for chat:", chat.title);
+                                                    if (newTitle && newTitle.trim() !== "") {
+                                                        handleRenameChat(chat.id, newTitle.trim());
+                                                    }
+                                                }}
+                                                className="gap-2"
+                                            >
+                                                <Pencil className="h-4 w-4" />
+                                                Rename chat
+                                            </DropdownMenuItem>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleDeleteChat(chat.id);
+                                                }}
+                                                className="text-red-600 dark:text-red-400 gap-2"
+                                            >
+                                                <Trash className="h-4 w-4" />
+                                                Delete chat
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                )}
                             </div>
                         ))}
                     </div>
@@ -417,7 +451,7 @@ export function ChatDemo() {
             {/* Main Content - Fixed Layout */}
             <div className="flex flex-1 flex-col h-full">
                 {/* Header - Fixed */}
-                <div className="flex-none border-b border-gray-200 dark:border-gray-800 p-4">
+                <div className="flex-none border-b border-border p-4">
                     <div className="max-w-3xl mx-auto flex items-center justify-between">
                         {currentChatId && (
                             <ChatTitle
