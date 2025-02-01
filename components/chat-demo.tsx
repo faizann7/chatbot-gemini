@@ -20,7 +20,9 @@ import {
     MessageSquare,
     ExternalLink,
     Menu,
-    Pencil
+    Pencil,
+    Check,
+    X,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -43,7 +45,7 @@ const saveChats = async (chatId: string, messages: Message[], title?: string) =>
                 userId: "guest",
                 chatId,
                 messages,
-                title: title || messages[0]?.content?.slice(0, 30) || 'New Chat'
+                title: title || messages[0]?.content?.slice(0, 30) || "New Chat",
             }),
         });
     } catch (error) {
@@ -55,7 +57,7 @@ const loadChats = async (): Promise<ChatHistory[]> => {
     try {
         const res = await fetch(`/api/chat/load?userId=guest`);
         if (!res.ok) {
-            throw new Error('Failed to load chats');
+            throw new Error("Failed to load chats");
         }
         const data = await res.json();
         return data.chats || [];
@@ -66,11 +68,17 @@ const loadChats = async (): Promise<ChatHistory[]> => {
     }
 };
 
-// Add this component for the editable title
+/**
+ * ChatTitle
+ *
+ * A header component that displays the chat title with inline editing.
+ * It shows a pencil icon for editing and, when in edit mode, displays save (check)
+ * and cancel (X) buttons.
+ */
 const ChatTitle = ({
     title,
     onRename,
-    className
+    className,
 }: {
     title: string;
     onRename: (newTitle: string) => void;
@@ -103,29 +111,50 @@ const ChatTitle = ({
     return (
         <div className={cn("flex items-center gap-2", className)}>
             {isEditing ? (
-                <input
-                    ref={inputRef}
-                    type="text"
-                    value={editableTitle}
-                    onChange={(e) => setEditableTitle(e.target.value)}
-                    onBlur={handleSubmit}
-                    onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleSubmit();
-                        if (e.key === 'Escape') {
+                <div className="flex items-center gap-2">
+                    <input
+                        ref={inputRef}
+                        type="text"
+                        value={editableTitle}
+                        onChange={(e) => setEditableTitle(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter") handleSubmit();
+                            if (e.key === "Escape") {
+                                setEditableTitle(title);
+                                setIsEditing(false);
+                            }
+                        }}
+                        className="bg-transparent border border-gray-300 dark:border-gray-700 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                    />
+                    <button
+                        onClick={handleSubmit}
+                        className="text-blue-500 hover:text-blue-600 p-1"
+                        aria-label="Save chat title"
+                    >
+                        <Check className="h-5 w-5" />
+                    </button>
+                    <button
+                        onClick={() => {
                             setEditableTitle(title);
                             setIsEditing(false);
-                        }
-                    }}
-                    className="bg-transparent border-none outline-none focus:ring-2 focus:ring-gray-200 dark:focus:ring-gray-700 rounded px-2 py-1 w-full"
-                />
+                        }}
+                        className="text-red-500 hover:text-red-600 p-1"
+                        aria-label="Cancel edit"
+                    >
+                        <X className="h-5 w-5" />
+                    </button>
+                </div>
             ) : (
-                <button
-                    onClick={() => setIsEditing(true)}
-                    className="flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded px-2 py-1 transition-colors"
-                >
-                    <span className="font-medium">{title}</span>
-                    <Pencil className="h-4 w-4 opacity-0 group-hover:opacity-100" />
-                </button>
+                <div className="flex items-center gap-2">
+                    <span className="font-semibold text-lg">{title}</span>
+                    <button
+                        onClick={() => setIsEditing(true)}
+                        className="p-1 hover:bg-gray-200 dark:hover:bg-gray-800 rounded transition-colors"
+                        aria-label="Edit chat title"
+                    >
+                        <Pencil className="h-4 w-4" />
+                    </button>
+                </div>
             )}
         </div>
     );
@@ -142,26 +171,32 @@ export function ChatDemo() {
     // Update chat when messages change
     useEffect(() => {
         if (messages.length > 0 && currentChatId) {
-            const currentChat = chatHistory.find(c => c.id === currentChatId);
+            const currentChat = chatHistory.find((c) => c.id === currentChatId);
             // Keep the existing title if it exists
             const title = currentChat?.title;
 
             if (title) {
                 // If we have a title, just update messages
-                setChatHistory(prev => prev.map(chat =>
-                    chat.id === currentChatId
-                        ? { ...chat, messages, updatedAt: new Date().toISOString() }
-                        : chat
-                ));
+                setChatHistory((prev) =>
+                    prev.map((chat) =>
+                        chat.id === currentChatId
+                            ? { ...chat, messages, updatedAt: new Date().toISOString() }
+                            : chat
+                    )
+                );
                 saveChats(currentChatId, messages, title);
             } else {
                 // If no title, generate one from first message
-                const newTitle = messages[0].content.slice(0, 30) + (messages[0].content.length > 30 ? '...' : '');
-                setChatHistory(prev => prev.map(chat =>
-                    chat.id === currentChatId
-                        ? { ...chat, messages, title: newTitle, updatedAt: new Date().toISOString() }
-                        : chat
-                ));
+                const newTitle =
+                    messages[0].content.slice(0, 30) +
+                    (messages[0].content.length > 30 ? "..." : "");
+                setChatHistory((prev) =>
+                    prev.map((chat) =>
+                        chat.id === currentChatId
+                            ? { ...chat, messages, title: newTitle, updatedAt: new Date().toISOString() }
+                            : chat
+                    )
+                );
                 saveChats(currentChatId, messages, newTitle);
             }
         }
@@ -184,7 +219,7 @@ export function ChatDemo() {
     }, []);
 
     const append = (message: Message) => {
-        setMessages(current => [...current, message]);
+        setMessages((current) => [...current, message]);
     };
 
     const handleChatSubmit = async (event: React.FormEvent) => {
@@ -202,7 +237,7 @@ export function ChatDemo() {
         const userMessage = {
             id: Date.now().toString(),
             role: "user",
-            content: input
+            content: input,
         };
         append(userMessage);
 
@@ -222,7 +257,7 @@ export function ChatDemo() {
             append({
                 id: (Date.now() + 1).toString(),
                 role: "assistant",
-                content: responseText
+                content: responseText,
             });
 
             setInput("");
@@ -231,7 +266,7 @@ export function ChatDemo() {
             append({
                 id: (Date.now() + 1).toString(),
                 role: "assistant",
-                content: err.message || "An error occurred"
+                content: err.message || "An error occurred",
             });
         } finally {
             setIsLoading(false);
@@ -242,20 +277,20 @@ export function ChatDemo() {
         const newChatId = Date.now().toString();
         const newChat = {
             id: newChatId,
-            title: 'New Chat',
+            title: "New Chat",
             messages: [],
-            updatedAt: new Date().toISOString()
+            updatedAt: new Date().toISOString(),
         };
 
         setCurrentChatId(newChatId);
         setMessages([]);
-        await saveChats(newChatId, [], 'New Chat');
-        setChatHistory(prev => [newChat, ...prev]);
+        await saveChats(newChatId, [], "New Chat");
+        setChatHistory((prev) => [newChat, ...prev]);
         toast.success("Started a new chat");
     };
 
     const handleChatSelect = async (chatId: string) => {
-        const chat = chatHistory.find(c => c.id === chatId);
+        const chat = chatHistory.find((c) => c.id === chatId);
         if (chat) {
             setCurrentChatId(chatId);
             setMessages(chat.messages);
@@ -265,9 +300,9 @@ export function ChatDemo() {
     const handleDeleteChat = async (chatId: string) => {
         try {
             await fetch(`/api/chat/delete?userId=guest&chatId=${chatId}`, {
-                method: 'DELETE'
+                method: "DELETE",
             });
-            setChatHistory(prev => prev.filter(chat => chat.id !== chatId));
+            setChatHistory((prev) => prev.filter((chat) => chat.id !== chatId));
             if (currentChatId === chatId) {
                 handleNewChat();
             }
@@ -280,20 +315,20 @@ export function ChatDemo() {
 
     const handleRenameChat = async (chatId: string, newTitle: string) => {
         try {
-            const chat = chatHistory.find(c => c.id === chatId);
+            const chat = chatHistory.find((c) => c.id === chatId);
             if (!chat) return;
 
             const updatedChat = {
                 ...chat,
                 title: newTitle,
-                updatedAt: new Date().toISOString()
+                updatedAt: new Date().toISOString(),
             };
 
             await saveChats(chatId, chat.messages, newTitle);
 
-            setChatHistory(prev => prev.map(c =>
-                c.id === chatId ? updatedChat : c
-            ));
+            setChatHistory((prev) =>
+                prev.map((c) => (c.id === chatId ? updatedChat : c))
+            );
 
             toast.success("Chat renamed");
         } catch (error) {
@@ -303,11 +338,11 @@ export function ChatDemo() {
     };
 
     return (
-        <div className="flex h-screen bg-white dark:bg-gray-900">
-            {/* Sidebar */}
-            <div className="flex flex-col w-[320px] bg-[#fafafa] border-r border-gray-200 dark:bg-gray-900 dark:border-gray-800">
-                {/* New Chat Button */}
-                <div className="p-3">
+        <div className="flex h-screen overflow-hidden bg-white dark:bg-gray-900">
+            {/* Sidebar - Fixed */}
+            <div className="flex h-full w-[260px] flex-col bg-[#fafafa] border-r border-gray-200 dark:bg-gray-900 dark:border-gray-800">
+                {/* New Chat Button - Fixed */}
+                <div className="flex-none p-3">
                     <Button
                         className="w-full justify-start gap-2 bg-gray-900 hover:bg-gray-800 text-white dark:bg-gray-700 dark:hover:bg-gray-600"
                         onClick={handleNewChat}
@@ -317,14 +352,14 @@ export function ChatDemo() {
                     </Button>
                 </div>
 
-                {/* Chat List */}
-                <ScrollArea className="flex-1 px-3 py-2">
-                    <div className="space-y-1">
+                {/* Chat List - Scrollable */}
+                <ScrollArea className="flex-1">
+                    <div className="px-3 py-2 space-y-1">
                         {chatHistory.map((chat) => (
                             <div
                                 key={chat.id}
                                 className={cn(
-                                    "group flex items-center justify-between rounded-lg px-3 py-2 cursor-pointer transition-colors relative",
+                                    "group flex items-center justify-between rounded-lg px-3 py-2 cursor-pointer transition-colors duration-200",
                                     chat.id === currentChatId
                                         ? "bg-gray-200 text-gray-900 dark:bg-gray-800 dark:text-white"
                                         : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
@@ -332,7 +367,6 @@ export function ChatDemo() {
                                 onClick={() => handleChatSelect(chat.id)}
                             >
                                 <div className="flex items-center gap-2 truncate pr-8">
-                                    <MessageSquare className="h-4 w-4 shrink-0" />
                                     <span className="truncate text-sm">{chat.title}</span>
                                 </div>
                                 <DropdownMenu>
@@ -350,6 +384,7 @@ export function ChatDemo() {
                                         <DropdownMenuItem
                                             onClick={(e) => {
                                                 e.stopPropagation();
+                                                // You can replace this with a modal if desired
                                                 const newTitle = prompt("Enter new name for chat:", chat.title);
                                                 if (newTitle && newTitle.trim() !== "") {
                                                     handleRenameChat(chat.id, newTitle.trim());
@@ -379,23 +414,14 @@ export function ChatDemo() {
                 </ScrollArea>
             </div>
 
-            {/* Main Content */}
-            <div className="flex-1 flex flex-col relative">
-                {/* Mobile Menu Button */}
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute top-4 left-4 md:hidden"
-                >
-                    <Menu className="h-6 w-6" />
-                </Button>
-
-                {/* Chat Header */}
-                <div className="border-b border-gray-200 dark:border-gray-800 p-4">
+            {/* Main Content - Fixed Layout */}
+            <div className="flex flex-1 flex-col h-full">
+                {/* Header - Fixed */}
+                <div className="flex-none border-b border-gray-200 dark:border-gray-800 p-4">
                     <div className="max-w-3xl mx-auto flex items-center justify-between">
                         {currentChatId && (
                             <ChatTitle
-                                title={chatHistory.find(c => c.id === currentChatId)?.title || 'New Chat'}
+                                title={chatHistory.find((c) => c.id === currentChatId)?.title || "New Chat"}
                                 onRename={(newTitle) => handleRenameChat(currentChatId, newTitle)}
                                 className="group"
                             />
@@ -403,38 +429,38 @@ export function ChatDemo() {
                     </div>
                 </div>
 
-                {/* Chat Interface */}
-                <div className="flex-1 flex flex-col max-w-3xl mx-auto w-full px-4">
-                    <Chat
-                        messages={messages}
-                        handleSubmit={handleChatSubmit}
-                        input={input}
-                        handleInputChange={(e) => setInput(e.target.value)}
-                        isLoading={isLoading}
-                        error={error}
-                        suggestions={[
-                            "Tell me a joke 😄",
-                            "Explain quantum computing 🔬",
-                            "Write a poem about nature 🌿",
-                            "Help me debug my code 💻"
-                        ]}
-                        className="flex-1 flex flex-col"
-                        messagesClassName="flex-1 px-4 py-3 space-y-6 overflow-y-auto"
-                        inputClassName="px-4 py-3 border-t dark:border-gray-800 bg-white dark:bg-gray-900"
-                    />
-
-                    {/* Footer */}
-                    <div className="text-center py-3 text-xs text-gray-500">
-                        <a
-                            href="https://gemini.google.com"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-300"
-                        >
-                            Powered by Gemini AI
-                            <ExternalLink className="h-3 w-3" />
-                        </a>
+                {/* Chat Container */}
+                <div className="flex-1 overflow-hidden">
+                    <div className="h-full max-w-3xl mx-auto w-full">
+                        <Chat
+                            messages={messages}
+                            handleSubmit={handleChatSubmit}
+                            input={input}
+                            handleInputChange={(e) => setInput(e.target.value)}
+                            isLoading={isLoading}
+                            error={error}
+                            suggestions={[
+                                "Tell me a joke 😄",
+                                "Explain quantum computing 🔬",
+                                "Write a poem about nature 🌿",
+                                "Help me debug my code 💻",
+                            ]}
+                            className="flex flex-col h-full"
+                        />
                     </div>
+                </div>
+
+                {/* Footer - Fixed */}
+                <div className="flex-none text-center py-3 text-xs text-gray-500">
+                    <a
+                        href="https://gemini.google.com"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-300"
+                    >
+                        Powered by Gemini AI
+                        <ExternalLink className="h-3 w-3" />
+                    </a>
                 </div>
             </div>
         </div>

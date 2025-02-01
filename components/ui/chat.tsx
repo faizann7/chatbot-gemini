@@ -11,6 +11,7 @@ import { CopyButton } from "@/components/ui/copy-button"
 import { MessageInput } from "@/components/ui/message-input"
 import { MessageList } from "@/components/ui/message-list"
 import { PromptSuggestions } from "@/components/ui/prompt-suggestions"
+import { ScrollArea } from "@/components/ui/scroll-area"
 
 interface ChatPropsBase {
   handleSubmit: (
@@ -115,7 +116,7 @@ const Chat = ({
       ) : null}
 
       <ChatForm
-        className="mt-auto"
+        className="mt-auto p-4"
         isPending={isGenerating || isTyping}
         handleSubmit={handleSubmit}
       >
@@ -128,7 +129,9 @@ const Chat = ({
             setFiles={setFiles}
             stop={stop}
             isGenerating={isGenerating}
+            className="h-auto overflow-hidden resize-none bg-gray-50"
           />
+
         )}
       </ChatForm>
     </ChatContainer>
@@ -146,38 +149,23 @@ export function ChatMessages({
 }>) {
   const {
     containerRef,
-    scrollToBottom,
     handleScroll,
-    shouldAutoScroll,
     handleTouchStart,
   } = useAutoScroll([messages])
 
   return (
-    <div
-      className="grid grid-cols-1 overflow-y-auto pb-4"
+    <ScrollArea
       ref={containerRef}
       onScroll={handleScroll}
       onTouchStart={handleTouchStart}
+      className="flex-1"
     >
-      <div className="max-w-full [grid-column:1/1] [grid-row:1/1]">
-        {children}
+      <div className="relative h-full">
+        <div className="p-4">
+          {children}
+        </div>
       </div>
-
-      <div className="flex flex-1 items-end justify-end [grid-column:1/1] [grid-row:1/1]">
-        {!shouldAutoScroll && (
-          <div className="sticky bottom-0 left-0 flex w-full justify-end">
-            <Button
-              onClick={scrollToBottom}
-              className="h-8 w-8 rounded-full ease-in-out animate-in fade-in-0 slide-in-from-bottom-1"
-              size="icon"
-              variant="ghost"
-            >
-              <ArrowDown className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
-      </div>
-    </div>
+    </ScrollArea>
   )
 }
 
@@ -188,7 +176,7 @@ export const ChatContainer = forwardRef<
   return (
     <div
       ref={ref}
-      className={cn("grid max-h-full w-full grid-rows-[1fr_auto]", className)}
+      className={cn("flex flex-col h-full overflow-hidden", className)}
       {...props}
     />
   )

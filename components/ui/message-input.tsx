@@ -182,7 +182,7 @@ export function MessageInput({
       />
 
       {props.allowAttachments && (
-        <div className="absolute inset-x-3 bottom-0 z-20 overflow-x-scroll py-3">
+        <div className="absolute inset-x-3 bottom-0 z-20 overflow-hidden py-3">
           <div className="flex space-x-3">
             <AnimatePresence mode="popLayout">
               {props.files?.map((file) => {
@@ -214,9 +214,10 @@ export function MessageInput({
           <Button
             type="button"
             size="icon"
-            variant="outline"
+            variant="ghost"
             className="h-8 w-8"
             aria-label="Attach a file"
+
             onClick={async () => {
               const files = await showFileUploadDialog()
               addFiles(files)
