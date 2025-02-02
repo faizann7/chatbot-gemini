@@ -129,7 +129,7 @@ const Chat = ({
             setFiles={setFiles}
             stop={stop}
             isGenerating={isGenerating}
-            className="h-auto overflow-hidden resize-none bg-[#292929] border-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-xl"
+            className="h-auto overflow-hidden resize-none bg-input hover:bg-input focus:bg-input border-0 focus-visible:ring-1 focus-visible:ring-primary/20 focus-visible:ring-offset-0 rounded-xl text-foreground placeholder:text-muted-foreground transition-colors duration-200"
           />
         )}
       </ChatForm>

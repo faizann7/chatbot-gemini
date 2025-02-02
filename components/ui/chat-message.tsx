@@ -13,8 +13,8 @@ const chatBubbleVariants = cva(
   {
     variants: {
       isUser: {
-        true: "bg-neutral-800 text-white rounded-2xl rounded-br-none self-end max-w-[85%]",
-        false: "text-foreground flex items-start gap-3",
+        true: "bg-primary text-primary-foreground rounded-2xl rounded-br-none self-end max-w-[85%]",
+        false: "flex items-start gap-3",
       },
       animation: {
         none: "",
@@ -128,12 +128,12 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
         )}
       >
         {role === "assistant" && (
-          <div className="w-8 h-8 rounded-full bg-[#292929] flex items-center justify-center text-white">
+          <div className="w-8 h-8 rounded-full bg-neutral-900 flex items-center justify-center text-white">
             AI
           </div>
         )}
         <div className="flex-1">
-          <div>
+          <div className={isUser ? "" : "text-foreground"}>
             <MarkdownRenderer>{content}</MarkdownRenderer>
           </div>
 

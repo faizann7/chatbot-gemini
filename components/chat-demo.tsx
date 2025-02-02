@@ -346,7 +346,7 @@ export function ChatDemo() {
     };
 
     return (
-        <div className="flex h-screen overflow-hidden bg-neutral-900">
+        <div className="flex h-screen overflow-hidden bg-background">
             {/* Sidebar - Fixed */}
             <div
                 className={cn(
@@ -407,7 +407,7 @@ export function ChatDemo() {
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
-                                                className="h-8 w-8 opacity-0 group-hover:opacity-100 absolute right-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-white"
+                                                className="h-8 w-8 opacity-0 group-hover:opacity-100 absolute right-2 text-muted-foreground hover:text-foreground"
                                                 onClick={(e) => e.stopPropagation()}
                                             >
                                                 <MoreVertical className="h-4 w-4" />
@@ -417,7 +417,6 @@ export function ChatDemo() {
                                             <DropdownMenuItem
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    // You can replace this with a modal if desired
                                                     const newTitle = prompt("Enter new name for chat:", chat.title);
                                                     if (newTitle && newTitle.trim() !== "") {
                                                         handleRenameChat(chat.id, newTitle.trim());
@@ -434,7 +433,7 @@ export function ChatDemo() {
                                                     e.stopPropagation();
                                                     handleDeleteChat(chat.id);
                                                 }}
-                                                className="text-red-600 dark:text-red-400 gap-2"
+                                                className="text-destructive-foreground gap-2"
                                             >
                                                 <Trash className="h-4 w-4" />
                                                 Delete chat
@@ -485,12 +484,12 @@ export function ChatDemo() {
                 </div>
 
                 {/* Footer - Fixed */}
-                <div className="flex-none text-center py-3 text-xs text-gray-500">
+                <div className="flex-none text-center py-3 text-xs text-muted-foreground">
                     <a
                         href="https://gemini.google.com"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-300"
+                        className="inline-flex items-center gap-1 hover:text-foreground"
                     >
                         Powered by Gemini AI
                         <ExternalLink className="h-3 w-3" />
