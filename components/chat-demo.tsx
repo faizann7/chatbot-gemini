@@ -36,7 +36,7 @@ interface ChatHistory {
     updatedAt: string;
 }
 
-const API_KEY = "AIzaSyCC6XshnCnVn8PqGaveDZ1Ba8csAt7UvPY";
+const API_KEY = "AIzaSyBBDrORVGX97fg_OQasbB-I_WFt_huR88U";
 const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
 
 const saveChats = async (chatId: string, messages: Message[], title?: string) => {
@@ -345,6 +345,125 @@ export function ChatDemo() {
         setIsSidebarCollapsed(!isSidebarCollapsed);
     };
 
+    const handleGenerateQuiz = async (messageId: string) => {
+        setIsLoading(true);
+        const messageToQuiz = messages.find(m => m.id === messageId);
+        if (!messageToQuiz) return;
+
+        try {
+            const response = await fetch(API_URL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    contents: [{
+                        role: "user",
+                        parts: [{
+                            text: `Generate exactly 3 multiple choice questions based on this content: "${messageToQuiz.content}". 
+                            Format your response as a valid JSON array ONLY, like this example:
+                            [
+                                {
+                                    "question": "What is the capital of France?",
+                                    "options": ["Paris", "London", "Berlin", "Madrid"],
+                                    "correctAnswer": 0
+                                },
+                                {
+                                    "question": "Which planet is closest to the Sun?",
+                                    "options": ["Venus", "Mercury", "Mars", "Earth"],
+                                    "correctAnswer": 1
+                                }
+                            ]
+                            Do not include any other text or explanation, just the JSON array.`
+                        }]
+                    }]
+                }),
+            });
+
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error.message);
+
+            let quizQuestions;
+            try {
+                // Try to parse the response text directly
+                quizQuestions = JSON.parse(data.candidates[0].content.parts[0].text.trim());
+            } catch (parseError) {
+                // If direct parsing fails, try to extract JSON from the response
+                const jsonMatch = data.candidates[0].content.parts[0].text.match(/\[[\s\S]*\]/);
+                if (jsonMatch) {
+                    quizQuestions = JSON.parse(jsonMatch[0]);
+                } else {
+                    throw new Error("Failed to parse quiz questions from response");
+                }
+            }
+
+            // Validate the quiz questions structure
+            if (!Array.isArray(quizQuestions) || quizQuestions.length === 0) {
+                throw new Error("Invalid quiz questions format");
+            }
+
+            setMessages(current => current.map(msg =>
+                msg.id === messageId ? {
+                    ...msg,
+                    quiz: {
+                        questions: quizQuestions,
+                        currentQuestion: 0,
+                        isComplete: false
+                    }
+                } : msg
+            ));
+
+        } catch (err: any) {
+            console.error("Quiz generation error:", err);
+            toast.error(err.message || "Failed to generate quiz");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleQuizAnswer = (messageId: string, answerIndex: number) => {
+        setMessages(current => current.map(msg => {
+            if (msg.id !== messageId || !msg.quiz) return msg;
+
+            const currentQ = msg.quiz.questions[msg.quiz.currentQuestion];
+            const isCorrect = currentQ.correctAnswer === answerIndex;
+
+            // Update the current question with user's answer
+            const updatedQuestions = [...msg.quiz.questions];
+            updatedQuestions[msg.quiz.currentQuestion] = {
+                ...currentQ,
+                userAnswer: answerIndex
+            };
+
+            // Check if this was the last question
+            const isLastQuestion = msg.quiz.currentQuestion === msg.quiz.questions.length - 1;
+
+            if (isLastQuestion) {
+                // Calculate final score
+                const score = updatedQuestions.reduce((acc, q) =>
+                    acc + (q.userAnswer === q.correctAnswer ? 1 : 0), 0);
+
+                return {
+                    ...msg,
+                    quiz: {
+                        ...msg.quiz,
+                        questions: updatedQuestions,
+                        isComplete: true,
+                        score
+                    }
+                };
+            }
+
+            // Move to next question
+            return {
+                ...msg,
+                quiz: {
+                    ...msg.quiz,
+                    questions: updatedQuestions,
+                    currentQuestion: msg.quiz.currentQuestion + 1
+                }
+            };
+        }));
+    };
+
     return (
         <div className="flex h-screen overflow-hidden bg-background">
             {/* Sidebar - Fixed */}
@@ -386,13 +505,14 @@ export function ChatDemo() {
                         {chatHistory.map((chat) => (
                             <div
                                 key={chat.id}
-                                className={cn(
-                                    "group flex items-center justify-between rounded-xl px-3 py-2 cursor-pointer transition-colors duration-200",
-                                    chat.id === currentChatId
-                                        ? "bg-accent text-accent-foreground"
-                                        : "text-muted-foreground hover:bg-accent/50"
-                                )}
                                 onClick={() => handleChatSelect(chat.id)}
+                                className={cn(
+                                    "group flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors relative cursor-pointer",
+                                    "hover:bg-[hsl(var(--sidebar-hover))] hover:text-[hsl(var(--sidebar-hover-foreground))]",
+                                    currentChatId === chat.id
+                                        ? "bg-[hsl(var(--sidebar-hover))] text-[hsl(var(--sidebar-hover-foreground))]"
+                                        : "text-muted-foreground"
+                                )}
                             >
                                 <div className="flex items-center gap-2 truncate">
                                     {isSidebarCollapsed ? (
@@ -472,6 +592,8 @@ export function ChatDemo() {
                             handleInputChange={(e) => setInput(e.target.value)}
                             isLoading={isLoading}
                             error={error}
+                            onGenerateQuiz={handleGenerateQuiz}
+                            onQuizAnswer={handleQuizAnswer}
                             suggestions={[
                                 "Tell me a joke 😄",
                                 "Explain quantum computing 🔬",

@@ -4,6 +4,7 @@ import {
   type Message,
 } from "@/components/ui/chat-message"
 import { TypingIndicator } from "@/components/ui/typing-indicator"
+import { QuizSection } from "./quiz-section"
 
 type AdditionalMessageOptions = Omit<ChatMessageProps, keyof Message>
 
@@ -12,8 +13,9 @@ interface MessageListProps {
   showTimeStamps?: boolean
   isTyping?: boolean
   messageOptions?:
-    | AdditionalMessageOptions
-    | ((message: Message) => AdditionalMessageOptions)
+  | AdditionalMessageOptions
+  | ((message: Message) => AdditionalMessageOptions)
+  onQuizAnswer?: (messageId: string, answerIndex: number) => void
 }
 
 export function MessageList({
@@ -21,6 +23,7 @@ export function MessageList({
   showTimeStamps = true,
   isTyping = false,
   messageOptions,
+  onQuizAnswer,
 }: MessageListProps) {
   return (
     <div className="space-y-4 overflow-visible">
@@ -31,12 +34,21 @@ export function MessageList({
             : messageOptions
 
         return (
-          <ChatMessage
-            key={index}
-            showTimeStamp={showTimeStamps}
-            {...message}
-            {...additionalOptions}
-          />
+          <div key={message.id}>
+            <ChatMessage
+              showTimeStamp={showTimeStamps}
+              {...message}
+              {...additionalOptions}
+            />
+            {message.quiz && (
+              <div className="ml-11">
+                <QuizSection
+                  {...message.quiz}
+                  onAnswer={(answerIndex) => onQuizAnswer?.(message.id, answerIndex)}
+                />
+              </div>
+            )}
+          </div>
         )
       })}
       {isTyping && <TypingIndicator />}

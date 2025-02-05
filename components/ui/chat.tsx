@@ -1,7 +1,7 @@
 "use client"
 
-import { forwardRef, useCallback, useState, type ReactElement } from "react"
-import { ArrowDown, ThumbsDown, ThumbsUp } from "lucide-react"
+import { forwardRef, useCallback, useState, type ReactElement, useRef, useEffect } from "react"
+import { ArrowDown, ThumbsDown, ThumbsUp, Brain, Send } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { useAutoScroll } from "@/hooks/use-auto-scroll"
@@ -12,6 +12,8 @@ import { MessageInput } from "@/components/ui/message-input"
 import { MessageList } from "@/components/ui/message-list"
 import { PromptSuggestions } from "@/components/ui/prompt-suggestions"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Textarea } from "@/components/ui/textarea"
+import { QuizSection } from "@/components/ui/quiz-section"
 
 interface ChatPropsBase {
   handleSubmit: (
@@ -28,6 +30,8 @@ interface ChatPropsBase {
     messageId: string,
     rating: "thumbs-up" | "thumbs-down"
   ) => void
+  onGenerateQuiz?: (messageId: string) => void
+  onQuizAnswer?: (messageId: string, answerIndex: number) => void
 }
 
 interface ChatPropsWithoutSuggestions extends ChatPropsBase {
@@ -53,14 +57,33 @@ const Chat = ({
   suggestions,
   className,
   onRateResponse,
+  onGenerateQuiz,
+  onQuizAnswer,
 }: ChatProps) => {
   const lastMessage = messages.at(-1)
   const isEmpty = messages.length === 0
   const isTyping = lastMessage?.role === "user"
+  const scrollAreaRef = useRef<HTMLDivElement>(null)
+  const textAreaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    if (scrollAreaRef.current) {
+      scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight
+    }
+  }, [messages])
+
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textAreaRef.current) {
+      textAreaRef.current.style.height = "inherit"
+      textAreaRef.current.style.height = `${textAreaRef.current.scrollHeight}px`
+    }
+  }, [input])
 
   const messageOptions = useCallback(
     (message: Message) => ({
-      actions: onRateResponse ? (
+      actions: (
         <>
           <div className="border-r pr-1">
             <CopyButton
@@ -68,31 +91,41 @@ const Chat = ({
               copyMessage="Copied response to clipboard!"
             />
           </div>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-6 w-6"
-            onClick={() => onRateResponse(message.id, "thumbs-up")}
-          >
-            <ThumbsUp className="h-4 w-4" />
-          </Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-6 w-6"
-            onClick={() => onRateResponse(message.id, "thumbs-down")}
-          >
-            <ThumbsDown className="h-4 w-4" />
-          </Button>
+          {message.role === "assistant" && onGenerateQuiz && !message.quiz && (
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-6 w-6"
+              onClick={() => onGenerateQuiz(message.id)}
+              title="Generate quiz"
+            >
+              <Brain className="h-4 w-4" />
+            </Button>
+          )}
+          {onRateResponse && (
+            <>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6"
+                onClick={() => onRateResponse(message.id, "thumbs-up")}
+              >
+                <ThumbsUp className="h-4 w-4" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6"
+                onClick={() => onRateResponse(message.id, "thumbs-down")}
+              >
+                <ThumbsDown className="h-4 w-4" />
+              </Button>
+            </>
+          )}
         </>
-      ) : (
-        <CopyButton
-          content={message.content}
-          copyMessage="Copied response to clipboard!"
-        />
       ),
     }),
-    [onRateResponse]
+    [onRateResponse, onGenerateQuiz]
   )
 
   return (
@@ -111,6 +144,7 @@ const Chat = ({
             messages={messages}
             isTyping={isTyping}
             messageOptions={messageOptions}
+            onQuizAnswer={onQuizAnswer}
           />
         </ChatMessages>
       ) : null}

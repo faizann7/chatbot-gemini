@@ -74,10 +74,23 @@ interface ToolResult {
 
 type ToolInvocation = PartialToolCall | ToolCall | ToolResult
 
+export interface QuizQuestion {
+  question: string;
+  options: string[];
+  correctAnswer: number;
+  userAnswer?: number;
+}
+
 export interface Message {
-  id: string
-  role: "user" | "assistant" | (string & {})
-  content: string
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  quiz?: {
+    questions: QuizQuestion[];
+    currentQuestion: number;
+    isComplete: boolean;
+    score?: number;
+  };
   createdAt?: Date
   experimental_attachments?: Attachment[]
   toolInvocations?: ToolInvocation[]
@@ -100,6 +113,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   className,
   experimental_attachments,
   toolInvocations,
+  quiz,
 }) => {
   const files = useMemo(() => {
     return experimental_attachments?.map((attachment) => {
