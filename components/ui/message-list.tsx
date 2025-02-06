@@ -16,6 +16,7 @@ interface MessageListProps {
   | AdditionalMessageOptions
   | ((message: Message) => AdditionalMessageOptions)
   onQuizAnswer?: (messageId: string, answerIndex: number) => void
+  onQuizRetry?: (messageId: string) => void
 }
 
 export function MessageList({
@@ -24,6 +25,7 @@ export function MessageList({
   isTyping = false,
   messageOptions,
   onQuizAnswer,
+  onQuizRetry,
 }: MessageListProps) {
   return (
     <div className="space-y-4 overflow-visible">
@@ -45,6 +47,7 @@ export function MessageList({
                 <QuizSection
                   {...message.quiz}
                   onAnswer={(answerIndex) => onQuizAnswer?.(message.id, answerIndex)}
+                  onRetry={() => onQuizRetry?.(message.id)}
                 />
               </div>
             )}

@@ -1,7 +1,7 @@
 "use client"
 
 import { forwardRef, useCallback, useState, type ReactElement, useRef, useEffect } from "react"
-import { ArrowDown, ThumbsDown, ThumbsUp, Brain, Send } from "lucide-react"
+import { ArrowDown, ThumbsDown, ThumbsUp, Brain, Send, BookOpen } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { useAutoScroll } from "@/hooks/use-auto-scroll"
@@ -32,6 +32,9 @@ interface ChatPropsBase {
   ) => void
   onGenerateQuiz?: (messageId: string) => void
   onQuizAnswer?: (messageId: string, answerIndex: number) => void
+  onQuizRetry?: (messageId: string) => void
+  onGenerateSessionQuiz?: () => void
+  showQuizUpdateNotification?: boolean
 }
 
 interface ChatPropsWithoutSuggestions extends ChatPropsBase {
@@ -59,6 +62,9 @@ const Chat = ({
   onRateResponse,
   onGenerateQuiz,
   onQuizAnswer,
+  onQuizRetry,
+  onGenerateSessionQuiz,
+  showQuizUpdateNotification,
 }: ChatProps) => {
   const lastMessage = messages.at(-1)
   const isEmpty = messages.length === 0
@@ -145,7 +151,29 @@ const Chat = ({
             isTyping={isTyping}
             messageOptions={messageOptions}
             onQuizAnswer={onQuizAnswer}
+            onQuizRetry={onQuizRetry}
           />
+
+          {messages.length >= 2 && (
+            <div className="sticky bottom-4 flex justify-center">
+              {showQuizUpdateNotification && (
+                <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 bg-primary text-primary-foreground px-4 py-2 rounded-full text-sm animate-in fade-in-0 slide-in-from-bottom-2">
+                  New content available! Take an updated quiz
+                </div>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/75"
+                onClick={onGenerateSessionQuiz}
+              >
+                <BookOpen className="mr-2 h-4 w-4" />
+                {messages.some(m => m.quiz?.type === 'session')
+                  ? 'Retake Session Quiz'
+                  : 'Quiz Me on This Chat'}
+              </Button>
+            </div>
+          )}
         </ChatMessages>
       ) : null}
 

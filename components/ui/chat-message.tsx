@@ -79,18 +79,22 @@ export interface QuizQuestion {
   options: string[];
   correctAnswer: number;
   userAnswer?: number;
+  explanation?: string;
+}
+
+export interface Quiz {
+  questions: QuizQuestion[];
+  currentQuestion: number;
+  isComplete: boolean;
+  score?: number;
+  type: 'message' | 'session';
 }
 
 export interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
-  quiz?: {
-    questions: QuizQuestion[];
-    currentQuestion: number;
-    isComplete: boolean;
-    score?: number;
-  };
+  quiz?: Quiz;
   createdAt?: Date
   experimental_attachments?: Attachment[]
   toolInvocations?: ToolInvocation[]

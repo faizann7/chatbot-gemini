@@ -25,15 +25,40 @@ import {
     X,
     ListCollapse,
     PanelRight,
+    Folder,
+    Brain,
+    BookOpen,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { SpaceActionsDropdown } from "@/components/ui/space-actions-dropdown";
+import { TabButton } from "@/components/ui/tab-button";
+import { QuizHistoryTab } from "@/components/ui/quiz-history-tab";
+import type { Space, ChatHistory, QuizHistory } from "@/types/space";
 
 interface ChatHistory {
     id: string;
     title: string;
     messages: Message[];
     updatedAt: string;
+}
+
+interface Space {
+    id: string;
+    name: string;
+    description?: string;
+    chats: ChatHistory[];
+    quizzes: QuizHistory[];
+    createdAt: string;
+    updatedAt: string;
+}
+
+interface QuizHistory {
+    id: string;
+    questions: QuizQuestion[];
+    score?: number;
+    takenAt: string;
+    type: 'message' | 'session';
 }
 
 const API_KEY = "AIzaSyBBDrORVGX97fg_OQasbB-I_WFt_huR88U";
@@ -163,6 +188,91 @@ const ChatTitle = ({
     );
 };
 
+// Helper function to prepare messages for the API
+const prepareMessagesForAPI = (messages: Message[]) => {
+    // Get last 10 messages to stay within context limits
+    const recentMessages = messages.slice(-10);
+
+    return recentMessages.map(msg => ({
+        role: msg.role,
+        parts: [{ text: msg.content }]
+    }));
+};
+
+// Update the determineQuizLength function to be more granular
+const determineQuizLength = (content: string, type: 'message' | 'session', messages: Message[]) => {
+    if (type === 'message') {
+        // For message quizzes, base it on content length
+        const wordCount = content.split(/\s+/).length;
+        if (wordCount < 100) return 2;
+        if (wordCount < 200) return 3;
+        if (wordCount < 300) return 4;
+        return 5;
+    } else {
+        // For session quizzes, base it on conversation length and complexity
+        const assistantMessages = messages.filter(m => m.role === 'assistant');
+        if (assistantMessages.length <= 5) return 4;
+        if (assistantMessages.length <= 10) return 6;
+        return 8;
+    }
+};
+
+const getPreviousQuizMistakes = (messages: Message[]) => {
+    // Collect concepts that the user got wrong in previous quizzes
+    const mistakes = messages
+        .filter(m => m.quiz?.isComplete)
+        .flatMap(m => m.quiz!.questions)
+        .filter(q => q.userAnswer !== undefined && q.userAnswer !== q.correctAnswer)
+        .map(q => ({
+            question: q.question,
+            correctAnswer: q.options[q.correctAnswer],
+            explanation: q.explanation
+        }));
+
+    return mistakes;
+};
+
+// Add helper function to analyze quiz history
+const analyzeQuizHistory = (messages: Message[]) => {
+    const quizHistory = messages
+        .filter(m => m.quiz?.isComplete)
+        .map(m => ({
+            questions: m.quiz!.questions,
+            score: m.quiz!.score || 0,
+            totalQuestions: m.quiz!.questions.length
+        }));
+
+    const averageScore = quizHistory.length > 0
+        ? quizHistory.reduce((acc, quiz) => acc + (quiz.score / quiz.totalQuestions), 0) / quizHistory.length
+        : null;
+
+    return {
+        quizzesTaken: quizHistory.length,
+        averageScore,
+        shouldIncreaseDifficulty: averageScore !== null && averageScore > 0.8 // Increase difficulty if avg score > 80%
+    };
+};
+
+// Add helper function to check if new content warrants a new quiz
+const shouldEnableNewSessionQuiz = (messages: Message[]) => {
+    const lastQuizIndex = messages.findLastIndex(m => m.quiz?.type === 'session');
+    if (lastQuizIndex === -1) return true;
+
+    // Get messages after the last quiz
+    const newMessages = messages.slice(lastQuizIndex + 1);
+    const newAssistantMessages = newMessages.filter(m => m.role === 'assistant');
+
+    // Check if there are enough new messages
+    if (newAssistantMessages.length < 3) return false;
+
+    // Check if new messages contain significant content
+    const significantMessages = newAssistantMessages.filter(m =>
+        m.content.split(/\s+/).length > 50  // Messages with more than 50 words
+    );
+
+    return significantMessages.length >= 2;  // At least 2 significant messages
+};
+
 export function ChatDemo() {
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
     const [chatHistory, setChatHistory] = useState<ChatHistory[]>([]);
@@ -171,6 +281,73 @@ export function ChatDemo() {
     const [input, setInput] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<Error | null>(null);
+    const [showQuizUpdateNotification, setShowQuizUpdateNotification] = useState(false);
+    const [spaces, setSpaces] = useState<Space[]>([]);
+    const [currentSpaceId, setCurrentSpaceId] = useState<string | null>(null);
+    const [activeTab, setActiveTab] = useState<'chat' | 'quizzes' | 'resources'>('chat');
+
+    // Move fetchSpaces inside component
+    const fetchSpaces = async () => {
+        try {
+            const response = await fetch('/api/spaces');
+            if (!response.ok) throw new Error('Failed to fetch spaces');
+            const spaces = await response.json();
+            setSpaces(spaces);
+
+            // If there was a current space, try to restore it
+            if (currentSpaceId) {
+                const currentSpace = spaces.find(s => s.id === currentSpaceId);
+                if (currentSpace) {
+                    // Restore messages from the current space's active chat
+                    const activeChat = currentSpace.chats[0]; // Or whichever chat was active
+                    if (activeChat) {
+                        setMessages(activeChat.messages);
+                    }
+                }
+            }
+        } catch (err) {
+            toast.error("Failed to load spaces");
+            console.error(err);
+        }
+    };
+
+    // Load spaces on component mount
+    useEffect(() => {
+        fetchSpaces();
+    }, []);
+
+    // Update KV when spaces change
+    useEffect(() => {
+        if (spaces.length > 0) {
+            fetch('/api/spaces/sync', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ spaces })
+            }).catch(err => {
+                console.error('Failed to sync spaces:', err);
+            });
+        }
+    }, [spaces]);
+
+    // Update messages in space when they change
+    useEffect(() => {
+        if (currentSpaceId && messages.length > 0) {
+            setSpaces(current => current.map(space =>
+                space.id === currentSpaceId
+                    ? {
+                        ...space,
+                        chats: [{
+                            id: space.chats[0]?.id || `chat-${Date.now()}`,
+                            title: space.chats[0]?.title || "Main Chat",
+                            messages,
+                            updatedAt: new Date().toISOString()
+                        }, ...space.chats.slice(1)],
+                        updatedAt: new Date().toISOString()
+                    }
+                    : space
+            ));
+        }
+    }, [messages, currentSpaceId]);
 
     // Update chat when messages change
     useEffect(() => {
@@ -222,35 +399,77 @@ export function ChatDemo() {
         loadAllChats();
     }, []);
 
+    // Add effect to check for new quiz availability
+    useEffect(() => {
+        if (shouldEnableNewSessionQuiz(messages) && messages.some(m => m.quiz?.type === 'session')) {
+            setShowQuizUpdateNotification(true);
+        }
+    }, [messages]);
+
+    // Clear messages when no space is selected
+    useEffect(() => {
+        if (!currentSpaceId) {
+            setMessages([]);
+        }
+    }, [currentSpaceId]);
+
     const append = (message: Message) => {
         setMessages((current) => [...current, message]);
     };
 
-    const handleChatSubmit = async (event: React.FormEvent) => {
-        event.preventDefault();
-        if (!input.trim()) return;
-
-        // Create new chat if none exists
-        if (!currentChatId) {
-            await handleNewChat();
+    // Update handleSpaceSelect to properly load space messages
+    const handleSpaceSelect = (spaceId: string) => {
+        const space = spaces.find(s => s.id === spaceId);
+        if (space) {
+            setCurrentSpaceId(spaceId);
+            // Load messages from the selected space's active chat
+            const activeChat = space.chats[0];
+            setMessages(activeChat?.messages || []);
         }
+    };
 
-        setIsLoading(true);
-        setError(null);
+    const handleChatSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        if (!input.trim() || !currentSpaceId) return;
 
-        const userMessage = {
+        const userMessage: Message = {
             id: Date.now().toString(),
             role: "user",
-            content: input,
+            content: input.trim(),
         };
-        append(userMessage);
+
+        // Add message to current chat
+        setMessages(current => [...current, userMessage]);
+        setInput("");
+
+        // Update space with new message
+        setSpaces(current => current.map(space =>
+            space.id === currentSpaceId
+                ? {
+                    ...space,
+                    chats: [{
+                        id: space.chats[0]?.id || `chat-${Date.now()}`,
+                        title: space.chats[0]?.title || "Main Chat",
+                        messages: [...(space.chats[0]?.messages || []), userMessage],
+                        updatedAt: new Date().toISOString()
+                    }, ...space.chats.slice(1)],
+                    updatedAt: new Date().toISOString()
+                }
+                : space
+        ));
 
         try {
+            // Get conversation history including the new message
+            const conversationHistory = prepareMessagesForAPI([
+                ...messages,
+                userMessage
+            ]);
+
             const response = await fetch(API_URL, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    contents: [{ role: "user", parts: [{ text: input }] }],
+                    contents: conversationHistory,
                 }),
             });
 
@@ -258,22 +477,20 @@ export function ChatDemo() {
             if (!response.ok) throw new Error(data.error.message);
 
             const responseText = data.candidates[0].content.parts[0].text;
-            append({
-                id: (Date.now() + 1).toString(),
-                role: "assistant",
-                content: responseText,
-            });
 
-            setInput("");
+            // Add AI response
+            setMessages(current => [
+                ...current,
+                {
+                    id: (Date.now() + 1).toString(),
+                    role: "assistant",
+                    content: responseText,
+                }
+            ]);
+
         } catch (err: any) {
             setError(err);
-            append({
-                id: (Date.now() + 1).toString(),
-                role: "assistant",
-                content: err.message || "An error occurred",
-            });
-        } finally {
-            setIsLoading(false);
+            toast.error(err.message || "Failed to send message");
         }
     };
 
@@ -345,37 +562,50 @@ export function ChatDemo() {
         setIsSidebarCollapsed(!isSidebarCollapsed);
     };
 
+    // Update handleGenerateQuiz for message-level quizzes
     const handleGenerateQuiz = async (messageId: string) => {
         setIsLoading(true);
         const messageToQuiz = messages.find(m => m.id === messageId);
         if (!messageToQuiz) return;
 
         try {
+            const messageIndex = messages.findIndex(m => m.id === messageId);
+            const contextMessages = messages.slice(0, messageIndex + 1);
+            const quizLength = determineQuizLength(messageToQuiz.content, 'message', contextMessages);
+            const previousMistakes = getPreviousQuizMistakes(messages);
+            const quizHistory = analyzeQuizHistory(messages);
+
+            const conversationHistory = prepareMessagesForAPI(contextMessages);
+            conversationHistory.push({
+                role: "user",
+                parts: [{
+                    text: `Generate exactly ${quizLength} multiple choice questions based on your previous explanation.
+                    ${previousMistakes.length > 0 ? `
+                    Consider these previously challenging concepts:
+                    ${previousMistakes.map(m => `- ${m.question}`).join('\n')}
+                    Try to include at least one question that tests understanding of these concepts.
+                    ` : ''}
+                    ${quizHistory.shouldIncreaseDifficulty ? 'Make the questions more challenging than usual.' : ''}
+                    Format your response as a valid JSON array ONLY:
+                    [
+                        {
+                            "question": "question text here",
+                            "options": ["option 1", "option 2", "option 3", "option 4"],
+                            "correctAnswer": 0,
+                            "explanation": "Brief explanation of why this is the correct answer",
+                            "difficulty": "beginner|intermediate|advanced",
+                            "topic": "specific topic or concept being tested"
+                        }
+                    ]
+                    Make questions progressively more challenging. Include clear explanations.
+                    Do not include any other text.`
+                }]
+            });
+
             const response = await fetch(API_URL, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    contents: [{
-                        role: "user",
-                        parts: [{
-                            text: `Generate exactly 3 multiple choice questions based on this content: "${messageToQuiz.content}". 
-                            Format your response as a valid JSON array ONLY, like this example:
-                            [
-                                {
-                                    "question": "What is the capital of France?",
-                                    "options": ["Paris", "London", "Berlin", "Madrid"],
-                                    "correctAnswer": 0
-                                },
-                                {
-                                    "question": "Which planet is closest to the Sun?",
-                                    "options": ["Venus", "Mercury", "Mars", "Earth"],
-                                    "correctAnswer": 1
-                                }
-                            ]
-                            Do not include any other text or explanation, just the JSON array.`
-                        }]
-                    }]
-                }),
+                body: JSON.stringify({ contents: conversationHistory }),
             });
 
             const data = await response.json();
@@ -419,27 +649,56 @@ export function ChatDemo() {
         }
     };
 
-    const handleQuizAnswer = (messageId: string, answerIndex: number) => {
+    // Update handleQuizAnswer to save quiz results to KV
+    const handleQuizAnswer = async (messageId: string, answerIndex: number) => {
         setMessages(current => current.map(msg => {
             if (msg.id !== messageId || !msg.quiz) return msg;
 
             const currentQ = msg.quiz.questions[msg.quiz.currentQuestion];
-            const isCorrect = currentQ.correctAnswer === answerIndex;
-
-            // Update the current question with user's answer
             const updatedQuestions = [...msg.quiz.questions];
             updatedQuestions[msg.quiz.currentQuestion] = {
                 ...currentQ,
                 userAnswer: answerIndex
             };
 
-            // Check if this was the last question
             const isLastQuestion = msg.quiz.currentQuestion === msg.quiz.questions.length - 1;
-
-            if (isLastQuestion) {
+            if (isLastQuestion && currentSpaceId) {
                 // Calculate final score
                 const score = updatedQuestions.reduce((acc, q) =>
                     acc + (q.userAnswer === q.correctAnswer ? 1 : 0), 0);
+
+                // Create quiz history entry
+                const quizHistory: QuizHistory = {
+                    id: messageId, // Use messageId as quiz id to prevent duplicates
+                    questions: updatedQuestions,
+                    score,
+                    takenAt: new Date().toISOString(),
+                    type: msg.quiz.type
+                };
+
+                // Update spaces with new quiz
+                setSpaces(current => current.map(space =>
+                    space.id === currentSpaceId
+                        ? {
+                            ...space,
+                            quizzes: [
+                                ...space.quizzes.filter(q => q.id !== messageId), // Remove old version if exists
+                                quizHistory
+                            ],
+                            updatedAt: new Date().toISOString()
+                        }
+                        : space
+                ));
+
+                // Save to KV
+                fetch(`/api/spaces/${currentSpaceId}/quizzes`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(quizHistory)
+                }).catch(err => {
+                    console.error('Failed to save quiz:', err);
+                    toast.error('Failed to save quiz results');
+                });
 
                 return {
                     ...msg,
@@ -464,16 +723,306 @@ export function ChatDemo() {
         }));
     };
 
+    const handleQuizRetry = (quizId: string) => {
+        // Find the quiz in the current space
+        const currentSpace = spaces.find(s => s.id === currentSpaceId);
+        if (!currentSpace) return;
+
+        const quiz = currentSpace.quizzes.find(q => q.id === quizId);
+        if (!quiz) return;
+
+        // Reset the quiz state
+        const updatedQuiz = {
+            ...quiz,
+            questions: quiz.questions.map(q => ({ ...q, userAnswer: undefined })),
+            score: undefined
+        };
+
+        // Update the space's quizzes
+        setSpaces(current => current.map(space =>
+            space.id === currentSpaceId
+                ? {
+                    ...space,
+                    quizzes: space.quizzes.map(q =>
+                        q.id === quizId ? updatedQuiz : q
+                    )
+                }
+                : space
+        ));
+
+        // Create a new message with the quiz
+        const quizMessage: Message = {
+            id: Date.now().toString(),
+            role: 'assistant',
+            content: quiz.type === 'session' ? 'Session Quiz' : 'Topic Quiz',
+            quiz: {
+                questions: updatedQuiz.questions,
+                currentQuestion: 0,
+                isComplete: false,
+                type: quiz.type
+            }
+        };
+
+        setMessages(current => [...current, quizMessage]);
+    };
+
+    // Update handleGenerateSessionQuiz for more personalized session quizzes
+    const handleGenerateSessionQuiz = async () => {
+        setIsLoading(true);
+        setShowQuizUpdateNotification(false);  // Clear notification when generating new quiz
+
+        try {
+            const conversationHistory = prepareMessagesForAPI(messages);
+            const quizLength = determineQuizLength('', 'session', messages);
+            const previousMistakes = getPreviousQuizMistakes(messages);
+            const quizHistory = analyzeQuizHistory(messages);
+
+            // If this is a retake, include previous quiz performance
+            const previousSessionQuiz = messages
+                .filter(m => m.quiz?.type === 'session')
+                .pop();
+
+            // Extract key topics with improved prompt
+            const keyTopicsPrompt = {
+                role: "user",
+                parts: [{
+                    text: `Analyze our conversation and identify the most important topics discussed.
+                    Consider:
+                    1. Core concepts that were explained in detail
+                    2. Topics that led to follow-up questions
+                    3. Technical or complex ideas that were broken down
+                    Format your response EXACTLY as a JSON array of objects:
+                    [
+                        {
+                            "topic": "Main topic name",
+                            "importance": "high|medium|low",
+                            "complexity": "basic|intermediate|advanced"
+                        }
+                    ]`
+                }]
+            };
+
+            // Get key topics
+            const topicsResponse = await fetch(API_URL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    contents: [...conversationHistory, keyTopicsPrompt]
+                }),
+            });
+
+            let keyTopics = [];
+            try {
+                const topicsData = await topicsResponse.json();
+                const topicsText = topicsData.candidates[0].content.parts[0].text.trim();
+                const jsonMatch = topicsText.match(/\[([\s\S]*?)\]/);
+                if (jsonMatch) {
+                    keyTopics = JSON.parse(jsonMatch[0]);
+                }
+            } catch (e) {
+                console.warn("Failed to parse key topics:", e);
+                keyTopics = messages
+                    .filter(m => m.role === 'assistant')
+                    .slice(-3)
+                    .map(m => ({
+                        topic: m.content.slice(0, 50) + "...",
+                        importance: "medium",
+                        complexity: "intermediate"
+                    }));
+            }
+
+            // Generate the quiz with improved prompting
+            conversationHistory.push({
+                role: "user",
+                parts: [{
+                    text: `Generate a comprehensive quiz with ${quizLength} multiple choice questions.
+                    Focus on these key topics:
+                    ${keyTopics.map(t => `- ${t.topic} (${t.importance} importance)`).join('\n')}
+                    
+                    ${previousSessionQuiz ? `
+                    This is a retake of a previous quiz. Focus on:
+                    1. New content added since the last quiz
+                    2. Topics that were challenging in the previous attempt
+                    3. Different aspects of previously covered topics
+                    ` : ''}
+
+                    ${previousMistakes.length > 0 ? `
+                    Include questions about these previously challenging concepts:
+                    ${previousMistakes.map(m => `- ${m.question}`).join('\n')}
+                    Make these questions more challenging than before.
+                    ` : ''}
+
+                    Format your response EXACTLY as a JSON array:
+                    [
+                        {
+                            "question": "Question text covering a key concept",
+                            "options": ["option 1", "option 2", "option 3", "option 4"],
+                            "correctAnswer": 0,
+                            "explanation": "Detailed explanation of why this is correct",
+                            "difficulty": "beginner|intermediate|advanced",
+                            "topic": "relevant topic from our discussion",
+                            "isNewContent": boolean
+                        }
+                    ]`
+                }]
+            });
+
+            const response = await fetch(API_URL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ contents: conversationHistory }),
+            });
+
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error.message);
+
+            let quizQuestions;
+            try {
+                quizQuestions = JSON.parse(data.candidates[0].content.parts[0].text.trim());
+            } catch (parseError) {
+                const jsonMatch = data.candidates[0].content.parts[0].text.match(/\[[\s\S]*\]/);
+                if (jsonMatch) {
+                    quizQuestions = JSON.parse(jsonMatch[0]);
+                } else {
+                    throw new Error("Failed to parse quiz questions");
+                }
+            }
+
+            // Create a new message for the session quiz
+            const quizMessage: Message = {
+                id: Date.now().toString(),
+                role: 'assistant',
+                content: previousSessionQuiz ? 'Updated Session Quiz' : 'Session Quiz',
+                quiz: {
+                    questions: quizQuestions,
+                    currentQuestion: 0,
+                    isComplete: false,
+                    type: 'session'
+                }
+            };
+
+            setMessages(current => [...current, quizMessage]);
+
+        } catch (err: any) {
+            console.error("Session quiz generation error:", err);
+            toast.error(err.message || "Failed to generate session quiz");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // Update handleCreateSpace to start with a clean slate
+    const handleCreateSpace = async () => {
+        const spaceName = prompt("Enter a name for your new learning space:");
+        if (!spaceName?.trim()) return;
+
+        // Clear any existing messages first
+        setMessages([]);
+
+        const welcomeMessage: Message = {
+            id: `msg-${Date.now()}`,
+            role: "assistant",
+            content: `Welcome to ${spaceName}! 👋\n\nThis is your learning space for ${spaceName}. You can:\n\n` +
+                "• Ask questions and get AI-powered answers\n" +
+                "• Take quizzes to test your knowledge\n" +
+                "• Review past conversations and quiz results\n\n" +
+                "What would you like to learn about today?"
+        };
+
+        const newSpace: Space = {
+            id: Date.now().toString(),
+            name: spaceName.trim(),
+            chats: [{
+                id: `chat-${Date.now()}`,
+                title: "Main Chat",
+                messages: [welcomeMessage],
+                updatedAt: new Date().toISOString()
+            }],
+            quizzes: [],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+
+        try {
+            const response = await fetch('/api/spaces', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newSpace)
+            });
+
+            if (!response.ok) throw new Error('Failed to create space');
+
+            setSpaces(current => [...current, newSpace]);
+            setCurrentSpaceId(newSpace.id);
+            setMessages([welcomeMessage]); // Set only the welcome message
+            toast.success("Space created successfully!");
+        } catch (err) {
+            toast.error("Failed to create space");
+            console.error(err);
+        }
+    };
+
+    // Update handleDeleteSpace to clear messages when deleting current space
+    const handleDeleteSpace = async (spaceId: string) => {
+        const space = spaces.find(s => s.id === spaceId);
+        if (!space) return;
+
+        const confirmDelete = window.confirm(
+            `Are you sure you want to delete "${space.name}"? This will remove all chats and quizzes in this space.`
+        );
+
+        if (!confirmDelete) return;
+
+        try {
+            await fetch(`/api/spaces/${spaceId}`, {
+                method: 'DELETE'
+            });
+
+            // If we're deleting the current space, clear it
+            if (currentSpaceId === spaceId) {
+                setCurrentSpaceId(null);
+                setMessages([]); // Clear messages
+            }
+
+            setSpaces(current => current.filter(s => s.id !== spaceId));
+            toast.success("Space deleted successfully");
+        } catch (err) {
+            toast.error("Failed to delete space");
+            console.error(err);
+        }
+    };
+
+    const handleRenameSpace = async (spaceId: string) => {
+        const space = spaces.find(s => s.id === spaceId);
+        if (!space) return;
+
+        const newName = prompt("Enter new name for this space:", space.name);
+        if (!newName?.trim() || newName === space.name) return;
+
+        try {
+            await fetch(`/api/spaces/${spaceId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: newName.trim() })
+            });
+
+            setSpaces(current => current.map(s =>
+                s.id === spaceId ? { ...s, name: newName.trim() } : s
+            ));
+            toast.success("Space renamed successfully");
+        } catch (err) {
+            toast.error("Failed to rename space");
+        }
+    };
+
     return (
         <div className="flex h-screen overflow-hidden bg-background">
-            {/* Sidebar - Fixed */}
-            <div
-                className={cn(
-                    "flex h-full flex-col bg-secondary border-r border-border transition-all duration-200",
-                    isSidebarCollapsed ? "w-[72px]" : "w-[260px]"
-                )}
-            >
-                {/* Top Bar with Collapse Button, New Chat, and Theme Toggle */}
+            {/* Spaces Sidebar */}
+            <div className={cn(
+                "flex h-full flex-col bg-secondary border-r border-border transition-all duration-200",
+                isSidebarCollapsed ? "w-[72px]" : "w-[260px]"
+            )}>
+                {/* Top Bar */}
                 <div className="flex-none py-4 px-2 flex items-center gap-2 justify-between">
                     <Button
                         variant="ghost"
@@ -490,7 +1039,7 @@ export function ChatDemo() {
                                 variant="ghost"
                                 size="icon"
                                 className="h-9 w-9 rounded-lg hover:bg-accent"
-                                onClick={handleNewChat}
+                                onClick={handleCreateSpace}
                             >
                                 <Plus className="h-5 w-5" />
                             </Button>
@@ -499,67 +1048,37 @@ export function ChatDemo() {
                     </div>
                 </div>
 
-                {/* Chat List - Scrollable */}
+                {/* Spaces List */}
                 <ScrollArea className="flex-1">
                     <div className="px-2 py-2 space-y-1">
-                        {chatHistory.map((chat) => (
+                        {spaces.map((space) => (
                             <div
-                                key={chat.id}
-                                onClick={() => handleChatSelect(chat.id)}
+                                key={space.id}
+                                onClick={() => handleSpaceSelect(space.id)}
                                 className={cn(
                                     "group flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors relative cursor-pointer",
                                     "hover:bg-[hsl(var(--sidebar-hover))] hover:text-[hsl(var(--sidebar-hover-foreground))]",
-                                    currentChatId === chat.id
+                                    currentSpaceId === space.id
                                         ? "bg-[hsl(var(--sidebar-hover))] text-[hsl(var(--sidebar-hover-foreground))]"
                                         : "text-muted-foreground"
                                 )}
                             >
+                                {/* Space item content */}
                                 <div className="flex items-center gap-2 truncate">
                                     {isSidebarCollapsed ? (
-                                        <MessageSquare className="h-4 w-4" />
+                                        <Folder className="h-4 w-4" />
                                     ) : (
-                                        <span className="truncate text-sm">{chat.title}</span>
+                                        <span className="truncate text-sm">{space.name}</span>
                                     )}
                                 </div>
+
+                                {/* Space actions dropdown */}
                                 {!isSidebarCollapsed && (
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-8 w-8 opacity-0 group-hover:opacity-100 absolute right-2 text-muted-foreground hover:text-foreground"
-                                                onClick={(e) => e.stopPropagation()}
-                                            >
-                                                <MoreVertical className="h-4 w-4" />
-                                            </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end" className="w-48">
-                                            <DropdownMenuItem
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    const newTitle = prompt("Enter new name for chat:", chat.title);
-                                                    if (newTitle && newTitle.trim() !== "") {
-                                                        handleRenameChat(chat.id, newTitle.trim());
-                                                    }
-                                                }}
-                                                className="gap-2"
-                                            >
-                                                <Pencil className="h-4 w-4" />
-                                                Rename chat
-                                            </DropdownMenuItem>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleDeleteChat(chat.id);
-                                                }}
-                                                className="text-destructive-foreground gap-2"
-                                            >
-                                                <Trash className="h-4 w-4" />
-                                                Delete chat
-                                            </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
+                                    <SpaceActionsDropdown
+                                        space={space}
+                                        onRename={handleRenameSpace}
+                                        onDelete={handleDeleteSpace}
+                                    />
                                 )}
                             </div>
                         ))}
@@ -567,56 +1086,91 @@ export function ChatDemo() {
                 </ScrollArea>
             </div>
 
-            {/* Main Content - Fixed Layout */}
+            {/* Main Content Area */}
             <div className="flex flex-1 flex-col h-full">
-                {/* Header - Fixed */}
-                <div className="flex-none border-b border-border p-4">
-                    <div className="max-w-3xl mx-auto flex items-center justify-between">
-                        {currentChatId && (
-                            <ChatTitle
-                                title={chatHistory.find((c) => c.id === currentChatId)?.title || "New Chat"}
-                                onRename={(newTitle) => handleRenameChat(currentChatId, newTitle)}
-                                className="group"
-                            />
-                        )}
-                    </div>
-                </div>
+                {currentSpaceId ? (
+                    <>
+                        {/* Space Header with Tabs */}
+                        <div className="flex-none border-b border-border">
+                            <div className="max-w-3xl mx-auto w-full px-4">
+                                <div className="flex items-center justify-between py-2">
+                                    <h2 className="text-lg font-semibold">
+                                        {spaces.find(s => s.id === currentSpaceId)?.name}
+                                    </h2>
+                                    <div className="flex gap-2">
+                                        <TabButton
+                                            active={activeTab === 'chat'}
+                                            onClick={() => setActiveTab('chat')}
+                                            icon={<MessageSquare className="h-4 w-4" />}
+                                            label="Chat"
+                                        />
+                                        <TabButton
+                                            active={activeTab === 'quizzes'}
+                                            onClick={() => setActiveTab('quizzes')}
+                                            icon={<Brain className="h-4 w-4" />}
+                                            label="Quizzes"
+                                        />
+                                        <TabButton
+                                            active={activeTab === 'resources'}
+                                            onClick={() => setActiveTab('resources')}
+                                            icon={<BookOpen className="h-4 w-4" />}
+                                            label="Resources"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
-                {/* Chat Container */}
-                <div className="flex-1 overflow-hidden">
-                    <div className="h-full max-w-3xl mx-auto w-full">
-                        <Chat
-                            messages={messages}
-                            handleSubmit={handleChatSubmit}
-                            input={input}
-                            handleInputChange={(e) => setInput(e.target.value)}
-                            isLoading={isLoading}
-                            error={error}
-                            onGenerateQuiz={handleGenerateQuiz}
-                            onQuizAnswer={handleQuizAnswer}
-                            suggestions={[
-                                "Tell me a joke 😄",
-                                "Explain quantum computing 🔬",
-                                "Write a poem about nature 🌿",
-                                "Help me debug my code 💻",
-                            ]}
-                            className="flex flex-col h-full"
-                        />
+                        {/* Tab Content */}
+                        <div className="flex-1 overflow-hidden">
+                            {activeTab === 'chat' && (
+                                <Chat
+                                    messages={messages}
+                                    handleSubmit={handleChatSubmit}
+                                    input={input}
+                                    handleInputChange={(e) => setInput(e.target.value)}
+                                    isLoading={isLoading}
+                                    error={error}
+                                    onGenerateQuiz={handleGenerateQuiz}
+                                    onQuizAnswer={handleQuizAnswer}
+                                    onQuizRetry={handleQuizRetry}
+                                    onGenerateSessionQuiz={handleGenerateSessionQuiz}
+                                    showQuizUpdateNotification={showQuizUpdateNotification}
+                                    suggestions={[
+                                        "Tell me about this topic 💡",
+                                        "Explain a concept 🤔",
+                                        "Practice with examples 📝",
+                                        "Test my knowledge 📚",
+                                    ]}
+                                    className="flex flex-col h-full"
+                                />
+                            )}
+                            {activeTab === 'quizzes' && (
+                                <QuizHistoryTab
+                                    quizzes={spaces.find(s => s.id === currentSpaceId)?.quizzes || []}
+                                    onRetakeQuiz={handleQuizRetry}
+                                />
+                            )}
+                            {activeTab === 'resources' && (
+                                <div className="h-full flex items-center justify-center text-muted-foreground">
+                                    Resources feature coming soon!
+                                </div>
+                            )}
+                        </div>
+                    </>
+                ) : (
+                    <div className="h-full flex items-center justify-center flex-col gap-4 text-center p-4">
+                        <h2 className="text-xl font-semibold">Welcome to Learning Spaces! 🎓</h2>
+                        <p className="text-muted-foreground max-w-md">
+                            Create a new space to start organizing your learning journey.
+                            Each space can contain chats, quizzes, and resources about a specific topic.
+                        </p>
+                        <Button onClick={handleCreateSpace}>
+                            <Plus className="mr-2 h-4 w-4" />
+                            Create Your First Space
+                        </Button>
                     </div>
-                </div>
-
-                {/* Footer - Fixed */}
-                <div className="flex-none text-center py-3 text-xs text-muted-foreground">
-                    <a
-                        href="https://gemini.google.com"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 hover:text-foreground"
-                    >
-                        Powered by Gemini AI
-                        <ExternalLink className="h-3 w-3" />
-                    </a>
-                </div>
+                )}
             </div>
         </div>
     );
