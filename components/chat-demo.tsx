@@ -28,6 +28,7 @@ import {
     Folder,
     Brain,
     BookOpen,
+    LayoutDashboard,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -285,6 +286,13 @@ export function ChatDemo() {
     const [spaces, setSpaces] = useState<Space[]>([]);
     const [currentSpaceId, setCurrentSpaceId] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<'chat' | 'quizzes' | 'resources'>('chat');
+
+    // Add new state for sorting spaces
+    const sortedSpaces = spaces.sort((a, b) => {
+        const aLastUpdate = new Date(a.updatedAt).getTime();
+        const bLastUpdate = new Date(b.updatedAt).getTime();
+        return bLastUpdate - aLastUpdate;
+    });
 
     // Move fetchSpaces inside component
     const fetchSpaces = async () => {
@@ -558,9 +566,7 @@ export function ChatDemo() {
         }
     };
 
-    const toggleSidebar = () => {
-        setIsSidebarCollapsed(!isSidebarCollapsed);
-    };
+    const toggleSidebar = () => setIsSidebarCollapsed(!isSidebarCollapsed);
 
     // Update handleGenerateQuiz for message-level quizzes
     const handleGenerateQuiz = async (messageId: string) => {
@@ -1016,106 +1022,143 @@ export function ChatDemo() {
     };
 
     return (
-        <div className="flex h-screen overflow-hidden bg-background">
-            {/* Spaces Sidebar */}
-            <div className={cn(
-                "flex h-full flex-col bg-secondary border-r border-border transition-all duration-200",
-                isSidebarCollapsed ? "w-[72px]" : "w-[260px]"
-            )}>
-                {/* Top Bar */}
-                <div className="flex-none py-4 px-2 flex items-center gap-2 justify-between">
+        <div className="flex h-screen">
+            {/* Sidebar */}
+            <div
+                className={cn(
+                    "border-r border-border flex flex-col transition-all duration-300",
+                    isSidebarCollapsed ? "w-16" : "w-64"
+                )}
+            >
+                {/* Sidebar Header */}
+                <div className="p-3 border-b border-border flex items-center justify-between">
+                    {!isSidebarCollapsed && (
+                        <h1 className="font-semibold text-lg tracking-tight">EdTutor</h1>
+                    )}
                     <Button
                         variant="ghost"
                         size="icon"
-                        className="h-9 w-9 rounded-lg hover:bg-accent"
-                        onClick={toggleSidebar}
+                        className="h-8 w-8"
+                        onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                        aria-label={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
                     >
-                        <PanelRight className="h-5 w-5" />
-                    </Button>
-
-                    <div className="flex items-center gap-2">
-                        {!isSidebarCollapsed && (
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-9 w-9 rounded-lg hover:bg-accent"
-                                onClick={handleCreateSpace}
-                            >
-                                <Plus className="h-5 w-5" />
-                            </Button>
+                        {isSidebarCollapsed ? (
+                            <PanelRight className="h-4 w-4" />
+                        ) : (
+                            <PanelRight className="h-4 w-4" />
                         )}
-                        <ThemeToggle />
-                    </div>
+                    </Button>
                 </div>
 
-                {/* Spaces List */}
-                <ScrollArea className="flex-1">
-                    <div className="px-2 py-2 space-y-1">
-                        {spaces.map((space) => (
-                            <div
-                                key={space.id}
-                                onClick={() => handleSpaceSelect(space.id)}
-                                className={cn(
-                                    "group flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors relative cursor-pointer",
-                                    "hover:bg-[hsl(var(--sidebar-hover))] hover:text-[hsl(var(--sidebar-hover-foreground))]",
-                                    currentSpaceId === space.id
-                                        ? "bg-[hsl(var(--sidebar-hover))] text-[hsl(var(--sidebar-hover-foreground))]"
-                                        : "text-muted-foreground"
-                                )}
-                            >
-                                {/* Space item content */}
-                                <div className="flex items-center gap-2 truncate">
-                                    {isSidebarCollapsed ? (
-                                        <Folder className="h-4 w-4" />
-                                    ) : (
-                                        <span className="truncate text-sm">{space.name}</span>
-                                    )}
-                                </div>
+                {/* Dashboard Button */}
+                <div className={cn("p-2", isSidebarCollapsed ? "flex justify-center" : "flex justify-start")}>
+                    <Button
+                        variant="ghost"
+                        className={cn(
+                            "flex items-center w-full",
+                            isSidebarCollapsed ? "justify-center" : "justify-start"
+                        )}
+                        onClick={() => console.log("Dashboard clicked")}
+                    >
+                        <LayoutDashboard className="h-4 w-4" />
+                        {!isSidebarCollapsed && <span className="ml-2">Dashboard</span>}
+                    </Button>
+                </div>
 
-                                {/* Space actions dropdown */}
-                                {!isSidebarCollapsed && (
-                                    <SpaceActionsDropdown
-                                        space={space}
-                                        onRename={handleRenameSpace}
-                                        onDelete={handleDeleteSpace}
-                                    />
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                </ScrollArea>
+                {/* Add Space Button */}
+                <div className={cn("p-2", isSidebarCollapsed ? "flex justify-center" : "flex justify-start")}>
+                    <Button
+                        variant="outline"
+                        className="flex items-center w-full border-dashed border-2"
+                        onClick={handleCreateSpace}
+                    >
+                        <Plus className="h-4 w-4" />
+                        {!isSidebarCollapsed && <span className="ml-2">Add new space</span>}
+                    </Button>
+                </div>
+
+                {/* Spaces Section */}
+                <div className="flex-1 flex flex-col min-h-0">
+                    {/* Spaces Header */}
+                    {!isSidebarCollapsed && (
+                        <div className="px-4 py-2">
+                            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                                Spaces
+                            </h2>
+                        </div>
+                    )}
+
+                    {/* Spaces List */}
+                    <ScrollArea className="flex-1">
+                        <div className="px-2 py-2 space-y-1">
+                            {sortedSpaces.map((space) => {
+                                const lastChat = space.chats[0]?.messages.slice(-1)[0];
+                                const lastQuiz = space.quizzes.slice(-1)[0];
+
+                                return (
+                                    <div
+                                        key={space.id}
+                                        onClick={() => handleSpaceSelect(space.id)}
+                                        className={cn(
+                                            "group rounded-lg transition-colors cursor-pointer",
+                                            isSidebarCollapsed ? "flex justify-center px-2 py-2" : "flex justify-start px-3 py-2",
+                                            "hover:bg-[hsl(var(--sidebar-hover))] hover:text-[hsl(var(--sidebar-hover-foreground))]",
+                                            currentSpaceId === space.id
+                                                ? "bg-[hsl(var(--sidebar-hover))] text-[hsl(var(--sidebar-hover-foreground))]"
+                                                : "text-muted-foreground"
+                                        )}
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <Folder className="h-4 w-4 shrink-0" />
+                                            {!isSidebarCollapsed && (
+                                                <span className="font-medium truncate">
+                                                    {space.name}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </ScrollArea>
+                </div>
             </div>
 
             {/* Main Content Area */}
             <div className="flex flex-1 flex-col h-full">
                 {currentSpaceId ? (
                     <>
-                        {/* Space Header with Tabs */}
+                        {/* Space Header with Tabs and Theme Toggle */}
                         <div className="flex-none border-b border-border">
-                            <div className="max-w-3xl mx-auto w-full px-4">
+                            <div className="max-w-[780px] mx-auto w-full px-4 relative">
                                 <div className="flex items-center justify-between py-2">
                                     <h2 className="text-lg font-semibold">
                                         {spaces.find(s => s.id === currentSpaceId)?.name}
                                     </h2>
-                                    <div className="flex gap-2">
-                                        <TabButton
-                                            active={activeTab === 'chat'}
-                                            onClick={() => setActiveTab('chat')}
-                                            icon={<MessageSquare className="h-4 w-4" />}
-                                            label="Chat"
-                                        />
-                                        <TabButton
-                                            active={activeTab === 'quizzes'}
-                                            onClick={() => setActiveTab('quizzes')}
-                                            icon={<Brain className="h-4 w-4" />}
-                                            label="Quizzes"
-                                        />
-                                        <TabButton
-                                            active={activeTab === 'resources'}
-                                            onClick={() => setActiveTab('resources')}
-                                            icon={<BookOpen className="h-4 w-4" />}
-                                            label="Resources"
-                                        />
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex gap-2">
+                                            <TabButton
+                                                active={activeTab === 'chat'}
+                                                onClick={() => setActiveTab('chat')}
+                                                icon={<MessageSquare className="h-4 w-4" />}
+                                                label="Chat"
+                                            />
+                                            <TabButton
+                                                active={activeTab === 'quizzes'}
+                                                onClick={() => setActiveTab('quizzes')}
+                                                icon={<Brain className="h-4 w-4" />}
+                                                label="Quizzes"
+                                            />
+                                            <TabButton
+                                                active={activeTab === 'resources'}
+                                                onClick={() => setActiveTab('resources')}
+                                                icon={<BookOpen className="h-4 w-4" />}
+                                                label="Resources"
+                                            />
+                                        </div>
+                                        <div className="ml-2">
+                                            <ThemeToggle variant="ghost" size="icon" className="h-8 w-8" />
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -1124,26 +1167,23 @@ export function ChatDemo() {
                         {/* Tab Content */}
                         <div className="flex-1 overflow-hidden">
                             {activeTab === 'chat' && (
-                                <Chat
-                                    messages={messages}
-                                    handleSubmit={handleChatSubmit}
-                                    input={input}
-                                    handleInputChange={(e) => setInput(e.target.value)}
-                                    isLoading={isLoading}
-                                    error={error}
-                                    onGenerateQuiz={handleGenerateQuiz}
-                                    onQuizAnswer={handleQuizAnswer}
-                                    onQuizRetry={handleQuizRetry}
-                                    onGenerateSessionQuiz={handleGenerateSessionQuiz}
-                                    showQuizUpdateNotification={showQuizUpdateNotification}
-                                    suggestions={[
-                                        "Tell me about this topic 💡",
-                                        "Explain a concept 🤔",
-                                        "Practice with examples 📝",
-                                        "Test my knowledge 📚",
-                                    ]}
-                                    className="flex flex-col h-full"
-                                />
+                                <div className="h-full max-w-[760px] mx-auto">
+                                    <Chat
+                                        messages={messages}
+                                        input={input}
+                                        handleSubmit={handleChatSubmit}
+                                        handleInputChange={(e) => setInput(e.target.value)}
+                                        isGenerating={isLoading}
+                                        onGenerateQuiz={handleGenerateQuiz}
+                                        onQuizAnswer={handleQuizAnswer}
+                                        onQuizRetry={handleQuizRetry}
+                                        showQuizUpdateNotification={showQuizUpdateNotification}
+                                        onGenerateSessionQuiz={() => {
+                                            setActiveTab('quizzes');
+                                            handleGenerateSessionQuiz();
+                                        }}
+                                    />
+                                </div>
                             )}
                             {activeTab === 'quizzes' && (
                                 <QuizHistoryTab
@@ -1153,22 +1193,31 @@ export function ChatDemo() {
                             )}
                             {activeTab === 'resources' && (
                                 <div className="h-full flex items-center justify-center text-muted-foreground">
-                                    Resources feature coming soon!
+                                    <div className="text-center">
+                                        <BookOpen className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                                        <h3 className="text-lg font-semibold mb-2">Resources Coming Soon!</h3>
+                                        <p>We're working on bringing you helpful learning materials.</p>
+                                    </div>
                                 </div>
                             )}
                         </div>
                     </>
                 ) : (
-                    <div className="h-full flex items-center justify-center flex-col gap-4 text-center p-4">
-                        <h2 className="text-xl font-semibold">Welcome to Learning Spaces! 🎓</h2>
-                        <p className="text-muted-foreground max-w-md">
-                            Create a new space to start organizing your learning journey.
-                            Each space can contain chats, quizzes, and resources about a specific topic.
-                        </p>
-                        <Button onClick={handleCreateSpace}>
-                            <Plus className="mr-2 h-4 w-4" />
-                            Create Your First Space
-                        </Button>
+                    <div className="h-full flex flex-col">
+                        <div className="flex-none border-b border-border p-4 flex justify-end">
+                            <ThemeToggle variant="ghost" size="icon" className="h-8 w-8" />
+                        </div>
+                        <div className="flex-1 flex items-center justify-center flex-col gap-4 text-center p-4">
+                            <h2 className="text-xl font-semibold">Welcome to Learning Spaces! 🎓</h2>
+                            <p className="text-muted-foreground max-w-md">
+                                Create a new space to start organizing your learning journey.
+                                Each space can contain chats, quizzes, and resources about a specific topic.
+                            </p>
+                            <Button onClick={handleCreateSpace}>
+                                <Plus className="mr-2 h-4 w-4" />
+                                Create Your First Space
+                            </Button>
+                        </div>
                     </div>
                 )}
             </div>
