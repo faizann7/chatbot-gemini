@@ -1021,6 +1021,12 @@ export function ChatDemo() {
         }
     };
 
+    // Update the Dashboard button click handler
+    const handleDashboardClick = () => {
+        setCurrentSpaceId(null);
+        setActiveTab('chat');
+    };
+
     return (
         <div className="flex h-screen">
             {/* Sidebar */}
@@ -1058,7 +1064,7 @@ export function ChatDemo() {
                             "flex items-center w-full",
                             isSidebarCollapsed ? "justify-center" : "justify-start"
                         )}
-                        onClick={() => console.log("Dashboard clicked")}
+                        onClick={handleDashboardClick}
                     >
                         <LayoutDashboard className="h-4 w-4" />
                         {!isSidebarCollapsed && <span className="ml-2">Dashboard</span>}
@@ -1204,19 +1210,106 @@ export function ChatDemo() {
                     </>
                 ) : (
                     <div className="h-full flex flex-col">
-                        <div className="flex-none border-b border-border p-4 flex justify-end">
-                            <ThemeToggle variant="ghost" size="icon" className="h-8 w-8" />
+                        <div className="flex-none border-b border-border">
+                            <div className="max-w-[780px] mx-auto w-full px-4 relative">
+                                <div className="flex items-center justify-between py-2">
+                                    <h2 className="text-lg font-semibold">Dashboard</h2>
+                                    <ThemeToggle variant="ghost" size="icon" className="h-8 w-8" />
+                                </div>
+                            </div>
                         </div>
-                        <div className="flex-1 flex items-center justify-center flex-col gap-4 text-center p-4">
-                            <h2 className="text-xl font-semibold">Welcome to Learning Spaces! 🎓</h2>
-                            <p className="text-muted-foreground max-w-md">
-                                Create a new space to start organizing your learning journey.
-                                Each space can contain chats, quizzes, and resources about a specific topic.
-                            </p>
-                            <Button onClick={handleCreateSpace}>
-                                <Plus className="mr-2 h-4 w-4" />
-                                Create Your First Space
-                            </Button>
+                        <div className="flex-1 overflow-auto p-4">
+                            <div className="max-w-[780px] mx-auto">
+                                {/* Welcome Section */}
+                                <div className="mb-8 text-center">
+                                    <h1 className="text-2xl font-bold mb-2">Welcome to Learning Spaces! 🎓</h1>
+                                    <p className="text-muted-foreground">
+                                        Organize your learning journey with dedicated spaces for different topics.
+                                    </p>
+                                </div>
+
+                                {/* Quick Actions Grid */}
+                                <div className="grid gap-4 mb-8 grid-cols-1 md:grid-cols-2">
+                                    {/* Create New Space Card */}
+                                    <div className="border border-dashed rounded-lg p-6 hover:border-foreground/50 transition-colors">
+                                        <div className="flex flex-col items-center text-center gap-2">
+                                            <div className="p-3 rounded-full bg-primary/10">
+                                                <Plus className="h-6 w-6" />
+                                            </div>
+                                            <h3 className="font-semibold">Create New Space</h3>
+                                            <p className="text-sm text-muted-foreground mb-2">
+                                                Start a new learning journey by creating a dedicated space
+                                            </p>
+                                            <Button onClick={handleCreateSpace}>
+                                                <Plus className="mr-2 h-4 w-4" />
+                                                New Space
+                                            </Button>
+                                        </div>
+                                    </div>
+
+                                    {/* Recent Activity Card */}
+                                    <div className="border rounded-lg p-6">
+                                        <div className="flex flex-col gap-2">
+                                            <h3 className="font-semibold">Recent Activity</h3>
+                                            {sortedSpaces.length > 0 ? (
+                                                <div className="space-y-2">
+                                                    {sortedSpaces.slice(0, 3).map(space => (
+                                                        <div
+                                                            key={space.id}
+                                                            onClick={() => handleSpaceSelect(space.id)}
+                                                            className="flex items-center gap-2 p-2 rounded-md hover:bg-muted cursor-pointer"
+                                                        >
+                                                            <Folder className="h-4 w-4 shrink-0" />
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="font-medium truncate">{space.name}</p>
+                                                                <p className="text-xs text-muted-foreground">
+                                                                    Last updated: {new Date(space.updatedAt).toLocaleDateString()}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <p className="text-sm text-muted-foreground">
+                                                    No recent activity to show
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* All Spaces Section */}
+                                {sortedSpaces.length > 0 && (
+                                    <div className="border rounded-lg p-6">
+                                        <h3 className="font-semibold mb-4">All Spaces</h3>
+                                        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                                            {sortedSpaces.map(space => (
+                                                <div
+                                                    key={space.id}
+                                                    onClick={() => handleSpaceSelect(space.id)}
+                                                    className="border rounded-md p-4 cursor-pointer hover:bg-muted transition-colors"
+                                                >
+                                                    <div className="flex items-start justify-between">
+                                                        <div className="flex items-center gap-2">
+                                                            <Folder className="h-4 w-4" />
+                                                            <span className="font-medium truncate">{space.name}</span>
+                                                        </div>
+                                                        <SpaceActionsDropdown
+                                                            space={space}
+                                                            onRename={handleRenameSpace}
+                                                            onDelete={handleDeleteSpace}
+                                                        />
+                                                    </div>
+                                                    <div className="mt-2 text-xs text-muted-foreground">
+                                                        <p>Chats: {space.chats.length}</p>
+                                                        <p>Quizzes: {space.quizzes.length}</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
                 )}
