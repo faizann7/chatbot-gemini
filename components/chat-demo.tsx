@@ -655,7 +655,7 @@ export function ChatDemo() {
         }
     };
 
-    // Update handleQuizAnswer to save quiz results to KV
+    // Update handleQuizAnswer to not show completed quizzes in chat
     const handleQuizAnswer = async (messageId: string, answerIndex: number) => {
         setMessages(current => current.map(msg => {
             if (msg.id !== messageId || !msg.quiz) return msg;
@@ -675,7 +675,7 @@ export function ChatDemo() {
 
                 // Create quiz history entry
                 const quizHistory: QuizHistory = {
-                    id: messageId, // Use messageId as quiz id to prevent duplicates
+                    id: messageId,
                     questions: updatedQuestions,
                     score,
                     takenAt: new Date().toISOString(),
@@ -688,7 +688,7 @@ export function ChatDemo() {
                         ? {
                             ...space,
                             quizzes: [
-                                ...space.quizzes.filter(q => q.id !== messageId), // Remove old version if exists
+                                ...space.quizzes.filter(q => q.id !== messageId),
                                 quizHistory
                             ],
                             updatedAt: new Date().toISOString()
@@ -705,6 +705,11 @@ export function ChatDemo() {
                     console.error('Failed to save quiz:', err);
                     toast.error('Failed to save quiz results');
                 });
+
+                // Remove quiz message from chat if it's a session quiz
+                if (msg.quiz.type === 'session') {
+                    return null; // This message will be filtered out
+                }
 
                 return {
                     ...msg,
@@ -726,7 +731,7 @@ export function ChatDemo() {
                     currentQuestion: msg.quiz.currentQuestion + 1
                 }
             };
-        }));
+        }).filter(Boolean)); // Filter out null messages
     };
 
     const handleQuizRetry = (quizId: string) => {
@@ -1033,6 +1038,7 @@ export function ChatDemo() {
             <div
                 className={cn(
                     "border-r border-border flex flex-col transition-all duration-300",
+                    "bg-background",
                     isSidebarCollapsed ? "w-16" : "w-64"
                 )}
             >
@@ -1108,14 +1114,16 @@ export function ChatDemo() {
                                         className={cn(
                                             "group rounded-lg transition-colors cursor-pointer",
                                             isSidebarCollapsed ? "flex justify-center px-2 py-2" : "flex justify-start px-3 py-2",
-                                            "hover:bg-[hsl(var(--sidebar-hover))] hover:text-[hsl(var(--sidebar-hover-foreground))]",
                                             currentSpaceId === space.id
-                                                ? "bg-[hsl(var(--sidebar-hover))] text-[hsl(var(--sidebar-hover-foreground))]"
-                                                : "text-muted-foreground"
+                                                ? "bg-accent text-accent-foreground"
+                                                : "text-muted-foreground hover:bg-muted hover:text-muted-foreground"
                                         )}
                                     >
                                         <div className="flex items-center gap-2">
-                                            <Folder className="h-4 w-4 shrink-0" />
+                                            <Folder className={cn(
+                                                "h-4 w-4 shrink-0",
+                                                currentSpaceId === space.id ? "text-accent-foreground" : "text-muted-foreground"
+                                            )} />
                                             {!isSidebarCollapsed && (
                                                 <span className="font-medium truncate">
                                                     {space.name}
@@ -1134,37 +1142,52 @@ export function ChatDemo() {
             <div className="flex flex-1 flex-col h-full">
                 {currentSpaceId ? (
                     <>
-                        {/* Space Header with Tabs and Theme Toggle */}
-                        <div className="flex-none border-b border-border">
+                        {/* Space Header with Centered Tabs */}
+                        <div className="flex-none border-none border-border">
                             <div className="max-w-[780px] mx-auto w-full px-4 relative">
-                                <div className="flex items-center justify-between py-2">
-                                    <h2 className="text-lg font-semibold">
-                                        {spaces.find(s => s.id === currentSpaceId)?.name}
-                                    </h2>
-                                    <div className="flex items-center gap-2">
-                                        <div className="flex gap-2">
-                                            <TabButton
-                                                active={activeTab === 'chat'}
-                                                onClick={() => setActiveTab('chat')}
-                                                icon={<MessageSquare className="h-4 w-4" />}
-                                                label="Chat"
-                                            />
-                                            <TabButton
-                                                active={activeTab === 'quizzes'}
-                                                onClick={() => setActiveTab('quizzes')}
-                                                icon={<Brain className="h-4 w-4" />}
-                                                label="Quizzes"
-                                            />
-                                            <TabButton
-                                                active={activeTab === 'resources'}
-                                                onClick={() => setActiveTab('resources')}
-                                                icon={<BookOpen className="h-4 w-4" />}
-                                                label="Resources"
-                                            />
-                                        </div>
-                                        <div className="ml-2">
-                                            <ThemeToggle variant="ghost" size="icon" className="h-8 w-8" />
-                                        </div>
+                                <div className="flex items-center justify-between py-6">
+                                    {/* Remove title and center the tabs */}
+                                    <div className="flex-1" /> {/* Spacer */}
+                                    <div className="inline-flex items-center bg-secondary rounded-2xl p-1">
+                                        <TabButton
+                                            active={activeTab === 'chat'}
+                                            onClick={() => setActiveTab('chat')}
+                                            icon={<MessageSquare className="h-4 w-4" />}
+                                            label="Chat"
+                                            className={cn(
+                                                "transition-colors",
+                                                activeTab === 'chat'
+                                                    ? "bg-background text-foreground"
+                                                    : "hover:bg-background/50 text-muted-foreground"
+                                            )}
+                                        />
+                                        <TabButton
+                                            active={activeTab === 'quizzes'}
+                                            onClick={() => setActiveTab('quizzes')}
+                                            icon={<Brain className="h-4 w-4" />}
+                                            label="Quiz"
+                                            className={cn(
+                                                "transition-colors",
+                                                activeTab === 'quizzes'
+                                                    ? "bg-background text-foreground"
+                                                    : "hover:bg-background/50 text-muted-foreground"
+                                            )}
+                                        />
+                                        <TabButton
+                                            active={activeTab === 'resources'}
+                                            onClick={() => setActiveTab('resources')}
+                                            icon={<BookOpen className="h-4 w-4" />}
+                                            label="Resources"
+                                            className={cn(
+                                                "transition-colors",
+                                                activeTab === 'resources'
+                                                    ? "bg-background text-foreground"
+                                                    : "hover:bg-background/50 text-muted-foreground"
+                                            )}
+                                        />
+                                    </div>
+                                    <div className="flex-1 flex justify-end"> {/* Spacer with theme toggle */}
+                                        <ThemeToggle variant="ghost" size="icon" className="h-8 w-8" />
                                     </div>
                                 </div>
                             </div>

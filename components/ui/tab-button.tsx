@@ -6,23 +6,21 @@ interface TabButtonProps {
     onClick: () => void
     icon: React.ReactNode
     label: string
+    className?: string
 }
 
-export function TabButton({ active, onClick, icon, label }: TabButtonProps) {
+export function TabButton({ active, onClick, icon, label, className }: TabButtonProps) {
     return (
-        <Button
-            variant="ghost"
-            size="sm"
-            className={cn(
-                "gap-2",
-                active
-                    ? "bg-secondary text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-            )}
+        <button
             onClick={onClick}
+            className={cn(
+                "flex items-center gap-3 px-4 py-1.5 rounded-2xl text-sm font-medium",
+                "transition-colors duration-200",
+                className
+            )}
         >
             {icon}
-            {label}
-        </Button>
+            <span>{label}</span>
+        </button>
     )
 } 

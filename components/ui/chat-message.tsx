@@ -3,10 +3,12 @@
 import React, { useMemo } from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { Code2, Loader2, Terminal } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
 import { cn } from "@/lib/utils"
 import { FilePreview } from "@/components/ui/file-preview"
 import { MarkdownRenderer } from "@/components/ui/markdown-renderer"
+import { QuizSection } from "@/components/ui/quiz-section"
 
 const chatBubbleVariants = cva(
   "group/message relative break-words p-3 text-sm",
@@ -105,6 +107,7 @@ export interface ChatMessageProps extends Message {
   animation?: Animation
   actions?: React.ReactNode
   className?: string
+  setActiveTab?: (tab: string) => void
 }
 
 export const ChatMessage: React.FC<ChatMessageProps> = ({
@@ -118,6 +121,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   experimental_attachments,
   toolInvocations,
   quiz,
+  setActiveTab,
 }) => {
   const files = useMemo(() => {
     return experimental_attachments?.map((attachment) => {
@@ -142,7 +146,8 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
     <div className={cn("group relative flex flex-col", className)}>
       <div
         className={cn(
-          chatBubbleVariants({ isUser: role === "user", animation })
+          "group relative flex items-start gap-3 py-4",
+          role === "user" ? "flex-row-reverse" : ""
         )}
       >
         {role === "assistant" && (
@@ -150,8 +155,16 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
             AI
           </div>
         )}
-        <div className="flex-1">
-          <div className={isUser ? "" : "text-foreground"}>
+        <div className={cn(
+          "flex-1 space-y-2",
+          role === "user" ? "flex flex-col items-end" : ""
+        )}>
+          <div className={cn(
+            "max-w-[85%] break-words",
+            role === "user"
+              ? "rounded-2xl border border-border bg-muted text-foreground px-4 py-3"
+              : "text-foreground"
+          )}>
             <MarkdownRenderer>{content}</MarkdownRenderer>
           </div>
 
@@ -174,6 +187,18 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
           {formattedTime}
         </time>
       ) : null}
+
+      {quiz?.isComplete && quiz.type !== 'session' && (
+        <QuizSection
+          questions={quiz.questions}
+          currentQuestion={quiz.currentQuestion}
+          isComplete={quiz.isComplete}
+          score={quiz.score}
+          onAnswer={() => { }}
+          setActiveTab={setActiveTab}
+          view="compact"
+        />
+      )}
     </div>
   )
 }
