@@ -29,6 +29,7 @@ import {
     Brain,
     BookOpen,
     LayoutDashboard,
+    Copy,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -36,6 +37,7 @@ import { SpaceActionsDropdown } from "@/components/ui/space-actions-dropdown";
 import { TabButton } from "@/components/ui/tab-button";
 import { QuizHistoryTab } from "@/components/ui/quiz-history-tab";
 import type { Space, ChatHistory, QuizHistory } from "@/types/space";
+import ChatMessage from "@/components/ui/chat-message";
 
 interface ChatHistory {
     id: string;
@@ -569,7 +571,7 @@ export function ChatDemo() {
     const toggleSidebar = () => setIsSidebarCollapsed(!isSidebarCollapsed);
 
     // Update handleGenerateQuiz for message-level quizzes
-    const handleGenerateQuiz = async (messageId: string) => {
+    const handleGenerateQuiz = async (messageId: string, content: string) => {
         setIsLoading(true);
         const messageToQuiz = messages.find(m => m.id === messageId);
         if (!messageToQuiz) return;
@@ -577,7 +579,7 @@ export function ChatDemo() {
         try {
             const messageIndex = messages.findIndex(m => m.id === messageId);
             const contextMessages = messages.slice(0, messageIndex + 1);
-            const quizLength = determineQuizLength(messageToQuiz.content, 'message', contextMessages);
+            const quizLength = determineQuizLength(content, 'message', contextMessages);
             const previousMistakes = getPreviousQuizMistakes(messages);
             const quizHistory = analyzeQuizHistory(messages);
 
@@ -1038,7 +1040,7 @@ export function ChatDemo() {
             <div
                 className={cn(
                     "border-r border-border flex flex-col transition-all duration-300",
-                    "bg-background",
+                    "bg-neutral-900",
                     isSidebarCollapsed ? "w-16" : "w-64"
                 )}
             >
@@ -1211,7 +1213,39 @@ export function ChatDemo() {
                                             setActiveTab('quizzes');
                                             handleGenerateSessionQuiz();
                                         }}
-                                    />
+                                    >
+                                        {messages.map(message => (
+                                            <ChatMessage
+                                                key={message.id}
+                                                {...message}
+                                                actions={
+                                                    message.role === "assistant" && (
+                                                        <>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                                                onClick={() => handleCopy(message.content)}
+                                                            >
+                                                                <Copy className="h-4 w-4" />
+                                                            </Button>
+                                                            {!message.quiz && (
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                                                    onClick={() => handleGenerateQuiz(message.id, message.content)}
+                                                                >
+                                                                    <Brain className="h-4 w-4" />
+                                                                </Button>
+                                                            )}
+                                                        </>
+                                                    )
+                                                }
+                                                setActiveTab={setActiveTab}
+                                            />
+                                        ))}
+                                    </Chat>
                                 </div>
                             )}
                             {activeTab === 'quizzes' && (

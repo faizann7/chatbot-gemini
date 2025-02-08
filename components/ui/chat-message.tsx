@@ -151,28 +151,28 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
         )}
       >
         {role === "assistant" && (
-          <div className="w-8 h-8 rounded-full bg-neutral-900 flex items-center justify-center text-white">
+          <div className="w-8 h-8 rounded-full border border-neutral-700 bg-neutral-800 flex items-center justify-center text-white">
             AI
           </div>
         )}
         <div className={cn(
-          "flex-1 space-y-2",
+          "flex-1 space-y-2 relative",
           role === "user" ? "flex flex-col items-end" : ""
         )}>
           <div className={cn(
-            "max-w-[85%] break-words",
+            "max-w-[85%] break-words group/message",
             role === "user"
               ? "rounded-2xl border border-border bg-muted text-foreground px-4 py-3"
               : "text-foreground"
           )}>
             <MarkdownRenderer>{content}</MarkdownRenderer>
-          </div>
 
-          {role === "assistant" && actions ? (
-            <div className="absolute right-4 top-3 flex items-center gap-1 opacity-0 group-hover/message:opacity-100 transition-opacity">
-              {actions}
-            </div>
-          ) : null}
+            {role === "assistant" && actions ? (
+              <div className="absolute right-0 top-0 flex items-center gap-2 opacity-0 group-hover/message:opacity-100 transition-opacity">
+                {actions}
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
 

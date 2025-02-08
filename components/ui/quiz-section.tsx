@@ -170,14 +170,14 @@ export function QuizSection({
                         disabled={selectedAnswer === null}
                         onClick={handleAnswerSubmit}
                     >
-                        Submit
+                        {currentQuestion === questions.length - 1 ? "Finish Quiz" : "Submit"}
                     </Button>
                 ) : (
                     <Button
                         className="min-w-[120px]"
                         onClick={handleNextQuestion}
                     >
-                        Next <ArrowRight className="ml-2 h-4 w-4" />
+                        {currentQuestion === questions.length - 1 ? "See Results" : "Next"}
                     </Button>
                 )}
             </div>
